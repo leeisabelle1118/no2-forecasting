@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Model checkpoints and outputs
+outputs/*.pt
+outputs/*.json
+outputs/*.png
+outputs/*.csv
+
+# Env / IDE
+.env
+.venv/
+.vscode/
+*.egg-info/
+
+# Data (large NetCDF files live outside the repo)
+*.nc
+data/*.nc
