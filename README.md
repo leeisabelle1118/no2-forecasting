@@ -156,12 +156,69 @@ python compare.py
 
 Generates four files in `outputs/`:
 
-| File | Contents |
-|---|---|
-| `comparison_results.json` | MSE, MAE, parameter counts |
-| `comparison_curves.png` | Train / val loss curves |
-| `comparison_scatter.png` | Predicted vs actual scatter |
-| `site_mae_map.png` | Per-site MAE on a lat/lon map |
+---
+
+#### `comparison_curves.png` — Training & validation loss curves
+
+Two side-by-side line plots (one per model) showing how MSE changes over training epochs.
+
+- **Training MSE (left panel)** — the loss computed on the training set each epoch.
+  A steadily decreasing curve means the model is learning. If it plateaus early,
+  try a lower learning rate or more capacity (`--d-model`, `--n-layers`).
+- **Validation MSE (right panel)** — the loss computed on held-out data the model
+  has never seen during training. This is the most important curve:
+  - If it keeps improving alongside training loss → the model is generalising well.
+  - If it starts rising while training loss falls → **overfitting**; the model has
+    memorised training data. Early stopping (default patience = 8) saves the best
+    checkpoint before this happens.
+  - A large gap between training and validation MSE also signals overfitting.
+- **Learning rate drops** are visible as sudden downward kinks — `ReduceLROnPlateau`
+  halves the LR automatically when validation loss stalls for 3 epochs.
+
+---
+
+#### `comparison_scatter.png` — Predicted vs actual NO₂
+
+One scatter plot per model, each showing 5,000 randomly sampled
+(actual, predicted) pairs from the test set (values are normalised).
+
+- **Perfect predictions** would lie exactly on the **dashed diagonal** (y = x).
+- **Points above the diagonal** → the model over-predicted NO₂.
+- **Points below the diagonal** → the model under-predicted NO₂.
+- **Tight clustering around the diagonal** = low error.
+- **Wide spread or fan shape** = the model struggles at high or low concentrations.
+- Compare the two panels: whichever has tighter scatter around the diagonal
+  is the better model.
+
+---
+
+#### `site_mae_map.png` — Per-site Mean Absolute Error map
+
+A lat/lon scatter map of all monitoring sites, coloured by their individual
+test-set MAE (yellow = low error, red = high error). One map per model.
+
+- **Yellow sites** — the model predicts NO₂ well at those locations.
+- **Red/orange sites** — the model struggles; possible reasons include:
+  - Highly variable local sources (busy intersections, industrial facilities)
+  - More missing data at that site during training
+  - The site is at the edge of the network's spatial coverage
+- Comparing the two model maps shows **where each architecture fails differently**,
+  which can inform ensemble weighting or site-specific fine-tuning.
+
+---
+
+#### `comparison_results.json` — Numeric summary
+
+Machine-readable summary of each model's test performance:
+```json
+{
+  "transformer": { "test_mse": 1.6057, "test_mae": 0.6940, "n_params": 3922590, ... },
+  "mamba":       { "test_mse": 2.0480, "test_mae": 0.8766, "n_params": 4020126, ... }
+}
+```
+MSE and MAE are in **normalised units** (each site divided by its training-set
+mean), so a MAE of 0.69 means predictions are off by ~69 % of the typical
+concentration at that site on average.
 
 ### Python API
 
