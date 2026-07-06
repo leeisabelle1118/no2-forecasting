@@ -64,7 +64,8 @@ class MambaBlock(nn.Module):
         self.dt_proj  = nn.Linear(d_state, d_inner, bias=True)
 
         # Initialise A as negative log of 1..N (standard HiPPO init)
-        A = torch.arange(1, d_state + 1).float().log().unsqueeze(0).expand(d_inner, -1)
+        # .clone() makes the tensor contiguous so load_state_dict works correctly
+        A = torch.arange(1, d_state + 1).float().log().unsqueeze(0).expand(d_inner, -1).clone()
         self.A_log    = nn.Parameter(A)
         self.D        = nn.Parameter(torch.ones(d_inner))
         self.out_proj = nn.Linear(d_inner, d_model, bias=False)

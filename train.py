@@ -207,7 +207,7 @@ def main():
 
     # ── Test evaluation ───────────────────────────────────────────────────────
     print(f"\nLoading best checkpoint for test evaluation …")
-    model.load_state_dict(torch.load(ckpt_path, map_location=device))
+    model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
     test_mse, test_mae = evaluate(model, X_test, y_test, device=device)
     print(f"\n{'='*60}")
     print(f"  TEST  mse={test_mse:.4f}   mae={test_mae:.4f}")

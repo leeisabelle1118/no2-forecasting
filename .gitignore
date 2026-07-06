@@ -7,11 +7,13 @@ __pycache__/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Model checkpoints and outputs
+# Model checkpoints (large binary files — keep out of git)
 outputs/*.pt
-outputs/*.json
-outputs/*.png
-outputs/*.csv
+
+# Keep plots, JSON results, and CSVs in git
+# outputs/*.png  — tracked
+# outputs/*.json — tracked
+# outputs/*.csv  — tracked
 
 # Env / IDE
 .env

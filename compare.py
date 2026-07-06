@@ -181,7 +181,7 @@ def main():
                          pred_len=pred_len, d_model=d_model,
                          n_layers=n_layers)
 
-        m.load_state_dict(torch.load(ckpt, map_location=device))
+        m.load_state_dict(torch.load(ckpt, map_location=device, weights_only=True))
         models_to_eval.append((model_name, m, meta))
         histories[model_name] = meta.get("history", [])
         results[model_name] = {
