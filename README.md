@@ -158,6 +158,31 @@ Generates four files in `outputs/`:
 
 ---
 
+## Training Results (2023-07-01 → 2024-09-30)
+
+24-hour look-back → 6-hour forecast, normalised NO₂, NVIDIA A10G GPU.
+
+| Model | Epochs | Best val MSE | Test MSE | Test MAE | Params |
+|---|---|---|---|---|---|
+| Transformer | 15 (early stop) | 0.6660 | 1.6057 | 0.6940 | 3.9 M |
+| Mamba | 11 (early stop) | 0.7443 | 2.0480 | 0.8766 | 4.0 M |
+
+The **Transformer outperforms Mamba** on this dataset. Mamba's sequential SSM scan is better suited to very long sequences (>512 steps); at 24-hour windows the Transformer's global attention has a natural advantage.
+
+### Loss curves
+
+![Training and validation MSE curves](outputs/comparison_curves.png)
+
+### Predicted vs actual
+
+![Predicted vs actual NO₂ scatter](outputs/comparison_scatter.png)
+
+### Per-site MAE map
+
+![Per-site MAE across monitoring network](outputs/site_mae_map.png)
+
+---
+
 #### `comparison_curves.png` — Training & validation loss curves
 
 Two side-by-side line plots (one per model) showing how MSE changes over training epochs.

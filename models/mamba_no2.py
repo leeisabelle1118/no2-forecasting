@@ -164,9 +164,11 @@ class NO2Mamba(nn.Module):
         return out.view(-1, self.pred_len, self.n_sites)
 
 
-# Reuse the same train / evaluate helpers as the Transformer module
-from models.transformer_no2 import (   # noqa: E402
-    _make_loader, train, evaluate
-)
+# Reuse the same train / evaluate helpers as the Transformer module.
+# Relative import works when used as part of the `models` package (normal use).
+try:
+    from .transformer_no2 import _make_loader, train, evaluate   # package import
+except ImportError:
+    from models.transformer_no2 import _make_loader, train, evaluate  # script import
 
 __all__ = ["NO2Mamba", "MambaBlock", "train", "evaluate"]
