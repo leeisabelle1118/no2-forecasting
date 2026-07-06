@@ -6,7 +6,19 @@ observations across ~182–197 US monitoring sites.
 
 ---
 
-## Dataset — AirNow NO₂
+## Datasets
+
+### AirNow — Ground-level NO₂ observations (model input)
+
+[AirNow](https://www.airnowapi.org/) is a US federal network of **ground-based
+air quality monitors** operated by EPA, state, tribal, and local agencies, as
+well as Canadian and Mexican partners. Each station continuously measures
+pollutant concentrations at ground level and reports hourly averages.
+
+**Why use it for forecasting?** Ground monitors provide dense, continuous
+time-series at fixed locations — ideal for training a temporal model. The goal
+of this project is to learn the daily and seasonal NO₂ patterns at each site
+and forecast the next 1–12 hours from recent history.
 
 | Property | Value |
 |---|---|
@@ -15,10 +27,62 @@ observations across ~182–197 US monitoring sites.
 | Date range | 2023-07-01 → 2024-09-30 (459 days) |
 | Sites | ~197 ground monitoring stations |
 | Temporal resolution | Hourly (24 observations/day) |
-| Variables | `no2` (PPB), `aqi`, `latitude`, `longitude`, `site_name` |
+| Variables | `no2` (PPB), `aqi`, `latitude`, `longitude`, `site_name`, `agency` |
 | Total timesteps | 10,992 hours |
 | Missing data | ~13.7 % overall |
 | Spatial bbox | −128→−100 °E, 31→52 °N (Pacific NW to Great Plains) |
+
+NO₂ values are in **parts per billion (PPB)** measured at ground level. The
+network spans the Pacific Northwest to the Great Plains and includes sites in
+Canada and Mexico. Missing values occur when a monitor is offline for
+maintenance or quality-control failures.
+
+**Typical patterns:**
+- **Diurnal cycle** — NO₂ peaks in the morning rush hour (~7–9 AM local) due
+  to vehicle emissions, dips in the afternoon as sunlight photo-dissociates it,
+  and rises again during the evening commute.
+- **Seasonal cycle** — Higher in winter (less UV sunlight to break down NO₂,
+  more home heating) and lower in summer.
+- **Spatial variation** — Urban/industrial sites show much higher levels than
+  rural monitors.
+
+---
+
+### TEMPO — Satellite NO₂ column measurements (companion dataset)
+
+[TEMPO](https://tempo.si.edu/) (Tropospheric Emissions: Monitoring of Pollution)
+is a NASA geostationary satellite instrument that has been continuously watching
+North America from space since 2023. Unlike polar-orbiting satellites that pass
+over once per day, TEMPO scans the same area **multiple times per day** (roughly
+every 1–2 hours during daylight), making it uniquely suited to track
+day-to-day and hour-to-hour pollution events.
+
+> **Note:** TEMPO data is used in the companion
+> [tempo-cartopy-visualizations](https://github.com/leeisabelle1118/tempo-cartopy-visualizations)
+> project for spatial mapping. It is **not** used as model input here, but
+> provides important spatial context for understanding where the AirNow ground
+> sites sit relative to satellite-observed NO₂ plumes.
+
+| Property | Value |
+|---|---|
+| Product | `TEMPO_NO2_L3_V04` (Level-3, gridded) |
+| Data path | `/mnt/data3/TEMPO/NO2_L3_V04/` |
+| Date range | 2023-08-02 → present |
+| Grid | 2950 lat × 7750 lon (~2 km resolution) |
+| Coverage | North America (14°→73°N, −168°→−13°E) |
+| Temporal resolution | ~hourly scans, daytime only (geostationary) |
+| Key variables | `vertical_column_troposphere` (molecules/cm²), `vertical_column_stratosphere`, `main_data_quality_flag` |
+| Source | [NASA ASDC DAAC](https://asdc.larc.nasa.gov/project/TEMPO/TEMPO_NO2_L3_V04) |
+
+**How NO₂ is measured differently by each dataset:**
+
+| | AirNow (ground) | TEMPO (satellite) |
+|---|---|---|
+| What it measures | Surface concentration (PPB) | Total column from surface to space (molecules/cm²) |
+| Spatial coverage | 197 point locations | Full North American map |
+| Temporal coverage | 24 h/day (continuous) | Daytime only (~7 AM–8 PM local) |
+| Spatial resolution | Point observations | ~2 km gridded |
+| Best for | Time-series forecasting | Spatial mapping & pollution events |
 
 ---
 
