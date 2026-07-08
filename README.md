@@ -158,6 +158,70 @@ Generates four files in `outputs/`:
 
 ---
 
+## Exploratory Data Analysis (EDA)
+
+All plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_explore_airnow.ipynb).
+
+---
+
+### Missing data heatmap
+
+![Missing data heatmap](outputs/eda_missing_data_heatmap.png)
+
+**Left panel:** Histogram of missing data % per site — shows how many monitoring stations have a given level of missingness. Answers "which sites are most unreliable?"
+
+**Right panel:** Line plot of daily mean missing % over time — shows whether data gaps are clustered in certain periods (e.g., outages, seasonal shutdowns). X-axis is date, Y-axis is % of sites missing that day.
+
+---
+
+### Site map
+
+![AirNow monitoring site map](outputs/eda_site_map.png)
+
+Scatter plot of all ~197 AirNow monitoring stations on a lat/lon grid (Pacific NW to Great Plains). Each dot is colored by that site's **mean NO₂ over the full dataset** using a yellow→orange→red colormap. Darker red = higher average NO₂ (typically urban/industrial areas).
+
+---
+
+### NO₂ time series — representative sites
+
+![NO₂ time series for representative sites](outputs/eda_no2_time_series.png)
+
+Three stacked time series plots (one per site), showing **hourly NO₂ (PPB)** over the full date range. Sites are selected automatically: the highest-mean site, the lowest-mean site (with >50% data coverage), and the best-coverage site. Useful for seeing site-level variability and data gaps.
+
+---
+
+### Diurnal cycle
+
+![Diurnal NO₂ cycle](outputs/eda_diurnal_cycle.png)
+
+Single line plot with a shaded band. X-axis is **hour of day (UTC)**, Y-axis is **NO₂ (PPB)**. The line is the mean across all sites and all days; the blue shaded region shows the 10th–90th percentile spread. Reveals the daily rhythm — typically a morning rush-hour peak and afternoon dip as sunlight breaks down NO₂.
+
+---
+
+### Monthly seasonal pattern
+
+![Monthly seasonal NO₂ pattern](outputs/eda_monthly_seasonal.png)
+
+Bar chart where each bar is one calendar month. Height = mean NO₂ across all sites for that month. Shows the **seasonal cycle** — higher NO₂ in winter (less UV, more heating) and lower in summer.
+
+---
+
+### Daily mean NO₂ time series
+
+**All sites (network-wide):**
+
+![Daily mean NO₂ — all sites](outputs/eda_daily_mean_all_sites.png)
+
+Blue line + ±1 std dev shaded band showing the **network-wide daily mean NO₂** over the full dataset. Captures long-term trends and anomaly periods.
+
+**Single site:**
+
+![Daily mean NO₂ — single site](outputs/eda_daily_mean_site.png)
+
+Blue line for a single station (`081030006`), showing that individual site's **daily mean NO₂** over time. Useful for comparing one station's behaviour against the network average.
+
+---
+
 ## Training Results (2023-07-01 → 2024-09-30)
 
 24-hour look-back → 6-hour forecast, normalised NO₂, NVIDIA A10G GPU.

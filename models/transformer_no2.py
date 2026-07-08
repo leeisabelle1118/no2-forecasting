@@ -176,3 +176,16 @@ def evaluate(
     mse = float(np.mean((preds - targets) ** 2))
     mae = float(np.mean(np.abs(preds - targets)))
     return mse, mae
+
+
+if __name__ == "__main__":
+    print("NO2Transformer — quick forward-pass check")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    m = NO2Transformer(n_sites=10, seq_len=24, pred_len=6).to(device)
+    x = torch.randn(4, 24, 10).to(device)
+    out = m(x)
+    assert out.shape == (4, 6, 10), f"Unexpected shape: {out.shape}"
+    params = sum(p.numel() for p in m.parameters())
+    print(f"  output shape : {tuple(out.shape)}  ✓")
+    print(f"  parameters   : {params:,}")
+    print(f"  device       : {device}")

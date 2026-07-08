@@ -172,3 +172,17 @@ except ImportError:
     from models.transformer_no2 import _make_loader, train, evaluate  # script import
 
 __all__ = ["NO2Mamba", "MambaBlock", "train", "evaluate"]
+
+
+if __name__ == "__main__":
+    import torch
+    print("NO2Mamba — quick forward-pass check")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    m = NO2Mamba(n_sites=10, seq_len=24, pred_len=6).to(device)
+    x = torch.randn(4, 24, 10).to(device)
+    out = m(x)
+    assert out.shape == (4, 6, 10), f"Unexpected shape: {out.shape}"
+    params = sum(p.numel() for p in m.parameters())
+    print(f"  output shape : {tuple(out.shape)}  ✓")
+    print(f"  parameters   : {params:,}")
+    print(f"  device       : {device}")
