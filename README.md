@@ -212,13 +212,13 @@ Bar chart where each bar is one calendar month. Height = mean NO₂ across all s
 
 ![Daily mean NO₂ — all sites](outputs/eda_daily_mean_all_sites.png)
 
-Blue line + ±1 std dev shaded band showing the **network-wide daily mean NO₂** over the full dataset. Captures long-term trends and anomaly periods.
+Red line + ±1 std dev shaded band showing the **network-wide daily mean NO₂** over the full dataset. Captures long-term trends and anomaly periods.
 
 **Single site:**
 
 ![Daily mean NO₂ — single site](outputs/eda_daily_mean_site.png)
 
-Blue line for a single station (`081030006`), showing that individual site's **daily mean NO₂** over time. Useful for comparing one station's behaviour against the network average.
+Red line for a single station (`081030006`), showing that individual site's **daily mean NO₂** over time. Useful for comparing one station's behaviour against the network average.
 
 ---
 
