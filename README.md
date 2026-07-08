@@ -168,9 +168,13 @@ All plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_exp
 
 ![Missing data heatmap](outputs/eda_missing_data_heatmap.png)
 
-**Left panel:** Histogram of missing data % per site — shows how many monitoring stations have a given level of missingness. Answers "which sites are most unreliable?"
+This chart has two panels side by side, both looking at missing NO₂ readings across the monitoring network.
 
-**Right panel:** Line plot of daily mean missing % over time — shows whether data gaps are clustered in certain periods (e.g., outages, seasonal shutdowns). X-axis is date, Y-axis is % of sites missing that day.
+**Left panel — "How much data is each station missing?"**
+Each bar shows how many stations are missing a certain percentage of their readings. A tall bar on the left means most stations have good data. A spread-out chart means some stations are much less reliable than others.
+
+**Right panel — "Are data gaps spread evenly over time, or bunched together?"**
+The line traces the percentage of stations that had missing readings on each day. Spikes mean many stations went offline at the same time — possibly from a storm, power outage, or scheduled maintenance. A flat line means missingness was steady and random.
 
 ---
 
@@ -178,7 +182,7 @@ All plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_exp
 
 ![AirNow monitoring site map](outputs/eda_site_map.png)
 
-Scatter plot of all ~197 AirNow monitoring stations on a lat/lon grid (Pacific NW to Great Plains). Each dot is colored by that site's **mean NO₂ over the full dataset** using a yellow→orange→red colormap. Darker red = higher average NO₂ (typically urban/industrial areas).
+A map of the US showing where all ~197 air quality monitoring stations are located. Each dot is one station. The dot color tells you how much NO₂ that station recorded on average — yellow dots measured low NO₂, orange and red dots measured high NO₂. Red dots are usually near cities, highways, or industrial areas. This helps you see which parts of the country have the worst air quality and where the monitoring network is densest.
 
 ---
 
@@ -186,7 +190,12 @@ Scatter plot of all ~197 AirNow monitoring stations on a lat/lon grid (Pacific N
 
 ![NO₂ time series for representative sites](outputs/eda_no2_time_series.png)
 
-Three stacked time series plots (one per site), showing **hourly NO₂ (PPB)** over the full date range. Sites are selected automatically: the highest-mean site, the lowest-mean site (with >50% data coverage), and the best-coverage site. Useful for seeing site-level variability and data gaps.
+Three line charts stacked on top of each other, each showing the hourly NO₂ readings for one station across the full 15-month dataset (July 2023 – September 2024). The three stations were chosen automatically to represent different extremes:
+- **Top** — the station with the highest average NO₂ (likely near a city or highway)
+- **Middle** — the station with the lowest average NO₂ (likely rural or coastal)
+- **Bottom** — the station with the most complete data (fewest missing readings)
+
+Gaps in the line mean the sensor was offline. Tall spikes mean pollution events. This gives a feel for how much variation exists between individual stations.
 
 ---
 
@@ -194,7 +203,7 @@ Three stacked time series plots (one per site), showing **hourly NO₂ (PPB)** o
 
 ![Diurnal NO₂ cycle](outputs/eda_diurnal_cycle.png)
 
-Single line plot with a shaded band. X-axis is **hour of day (UTC)**, Y-axis is **NO₂ (PPB)**. The line is the mean across all sites and all days; the blue shaded region shows the 10th–90th percentile spread. Reveals the daily rhythm — typically a morning rush-hour peak and afternoon dip as sunlight breaks down NO₂.
+This chart shows the average shape of a typical day's NO₂ levels, averaged across all stations and all days in the dataset. The X-axis is the hour of the day (in UTC), and the Y-axis is NO₂ in parts per billion (PPB). The solid blue line is the average across all stations, and the light blue shaded region shows how much variation there is between stations (10th to 90th percentile). You can see that NO₂ tends to peak in the morning when traffic is heaviest, drops during the afternoon as sunlight breaks it down, then rises slightly again in the evening commute.
 
 ---
 
@@ -202,7 +211,7 @@ Single line plot with a shaded band. X-axis is **hour of day (UTC)**, Y-axis is 
 
 ![Monthly seasonal NO₂ pattern](outputs/eda_monthly_seasonal.png)
 
-Bar chart where each bar is one calendar month. Height = mean NO₂ across all sites for that month. Shows the **seasonal cycle** — higher NO₂ in winter (less UV, more heating) and lower in summer.
+A bar chart where each bar is one month. The height of the bar shows the average NO₂ level across all stations during that month. This makes it easy to see seasonal trends — NO₂ is typically higher in winter months because there is less sunlight to break it down and more energy is burned for heating. Summer months tend to show lower NO₂ even though there is more traffic, because stronger sunlight destroys NO₂ faster.
 
 ---
 
@@ -212,13 +221,13 @@ Bar chart where each bar is one calendar month. Height = mean NO₂ across all s
 
 ![Daily mean NO₂ — all sites](outputs/eda_daily_mean_all_sites.png)
 
-Blue line + ±1 std dev shaded band showing the **network-wide daily mean NO₂** over the full dataset. Captures long-term trends and anomaly periods.
+This chart shows the average NO₂ level across all stations for every single day in the dataset. The blue line is the daily average and the shaded region shows ±1 standard deviation — how spread out the stations were on that day. A wide shaded band means stations varied a lot that day; a narrow band means they were all similar. This is useful for spotting unusual events that affected the whole network at once, like a wildfire or heatwave.
 
 **Single site:**
 
 ![Daily mean NO₂ — single site](outputs/eda_daily_mean_site.png)
 
-Blue line for a single station (`081030006`), showing that individual site's **daily mean NO₂** over time. Useful for comparing one station's behaviour against the network average.
+The same type of chart but zoomed in to just one station (`081030006`). Instead of the network average, you see exactly what that one location measured each day. Comparing this to the all-sites chart above lets you see whether a station follows the same trends as the rest of the network or behaves differently due to local conditions.
 
 ---
 
