@@ -36,6 +36,8 @@ This notebook answers the most fundamental questions before any model is touched
 ### 1. Missing Data Heatmap
 **File:** `outputs/eda_missing_data_heatmap.png`
 
+![Missing data heatmap](outputs/eda_missing_data_heatmap.png)
+
 Two side-by-side panels that together characterise data reliability across the network.
 
 **Left panel — Site-level missing data distribution (histogram)**
@@ -88,6 +90,8 @@ also anchors the per-site error maps produced in Notebook 03.
 ### 3. NO₂ Time Series — Representative Sites
 **File:** `outputs/eda_no2_time_series.png`
 
+![NO₂ time series for representative sites](outputs/eda_no2_time_series.png)
+
 Three stacked line charts, each covering the full 15-month dataset (July 2023 –
 September 2024) at hourly resolution, for three automatically-selected stations:
 
@@ -109,6 +113,8 @@ handle across stations.
 
 ### 4. Diurnal Cycle
 **File:** `outputs/eda_diurnal_cycle.png`
+
+![Diurnal NO₂ cycle](outputs/eda_diurnal_cycle.png)
 
 A single line chart where the X-axis is hour of day (UTC, 0–23) and the Y-axis
 is mean NO₂ in PPB. The solid blue line is the grand average over all stations
@@ -137,6 +143,8 @@ corresponding hour from the previous cycle.
 ### 5. Monthly Seasonal Pattern (Box Plot)
 **File:** `plots/monthly_boxplot.png`
 
+![Monthly seasonal NO₂ pattern](plots/monthly_boxplot.png)
+
 A box-and-whisker plot with one box per calendar month. Each box summarises the
 distribution of monthly-mean NO₂ values *across all monitoring stations*:
 - Centre line = median across sites.
@@ -161,6 +169,8 @@ expectations for which months will be harder to forecast accurately.
 ### 6. Daily Mean NO₂ Time Series — All Sites
 **File:** `outputs/eda_daily_mean_all_sites.png`
 
+![Daily mean NO₂ — all sites](outputs/eda_daily_mean_all_sites.png)
+
 A line chart showing the network-wide daily mean NO₂ (average across all sites,
 then resampled to daily resolution). The blue line is the daily mean; the shaded
 region shows ±1 standard deviation across sites on that day.
@@ -181,6 +191,8 @@ used in model evaluation.
 
 ### 7. Daily Mean NO₂ — Single Site
 **File:** `outputs/eda_daily_mean_site.png`
+
+![Daily mean NO₂ — single site](outputs/eda_daily_mean_site.png)
 
 The same daily-mean chart as above, but focused on a single station (`081030006`).
 There is no shaded band — this is a single sensor's actual record.
@@ -205,6 +217,8 @@ These questions directly inform what the model must generalise across.
 ### 1. Top-N Highest-NO₂ Sites
 **File:** `plots/ts_top_sites.png`
 
+![Top-N highest-NO₂ sites](plots/ts_top_sites.png)
+
 Daily-mean time series for the five stations with the highest average NO₂
 concentration (filtered to stations with ≥ 70 % data coverage to ensure complete
 traces). Each station is a separate coloured line.
@@ -224,6 +238,8 @@ per-site mean normalisation applied before training.
 
 ### 2. Regional Time Series — West / Central / East
 **File:** `plots/ts_regional.png`
+
+![Regional NO₂ time series](plots/ts_regional.png)
 
 Three smoothed lines (daily mean resampled to daily, then plotted) showing the
 average NO₂ trajectory for stations in three geographic bands:
@@ -248,6 +264,8 @@ per-site MAE map (Notebook 03).
 ### 3. Seasonal Diurnal Overlay
 **File:** `plots/ts_seasonal_overlay.png`
 
+![Seasonal diurnal overlay](plots/ts_seasonal_overlay.png)
+
 Twelve lines on a single chart, one per calendar month, each showing the average
 diurnal profile (mean NO₂ by hour of day) for that month. The X-axis is hour
 (0–23 UTC) and the Y-axis is mean PPB. Each line is distinctly coloured.
@@ -269,6 +287,8 @@ modulation of the diurnal shape from the training data.
 
 ### 4. Rolling Average / Smoothed Trends
 **File:** `plots/ts_rolling_avg.png`
+
+![Rolling average trends](plots/ts_rolling_avg.png)
 
 Three overlaid series on a single plot:
 - **Light grey line** — raw daily mean NO₂ (noisy).
@@ -292,6 +312,8 @@ residuals in the Notebook 03 ACF plots.
 
 ### 5. Anomaly Bar Chart
 **File:** `plots/ts_anomaly.png`
+
+![NO₂ anomaly bar chart](plots/ts_anomaly.png)
 
 A bar chart where each bar represents one day. Bar height = daily mean NO₂ minus
 the 30-day rolling baseline (the "anomaly"). Bars coloured:
@@ -317,6 +339,8 @@ for subjectively assessing the forecast quality on extreme days.
 
 ### 6. Anomaly Detection Overlay
 **File:** `plots/ts_anomaly_overlay.png`
+
+![Anomaly detection overlay](plots/ts_anomaly_overlay.png)
 
 The same daily time series as the network-wide chart from Notebook 01, but with
 event markers and background shading added:
@@ -348,6 +372,8 @@ interrogation of the model's behaviour on held-out test data.
 
 ### 1. Forecast Error Time Decomposition
 **File:** `plots/diag_error_decomp.png`
+
+> *Run `notebooks/03_model_diagnostics.ipynb` to generate this image.*
 
 Two grouped bar charts side by side, with Transformer (blue) and Mamba (orange)
 bars in each:
@@ -382,6 +408,8 @@ capacity, seasonal coverage, or spatial diversity.
 ### 2. Attention Weight Heatmap
 **File:** `plots/diag_attention_weights.png`
 
+> *Run `notebooks/03_model_diagnostics.ipynb` to generate this image.*
+
 One heatmap per Transformer encoder layer (2 layers by default), each panel
 showing a 24 × 24 grid. Rows are query positions (which output time step is
 "looking"), columns are key positions (which input time step is "being attended
@@ -413,6 +441,8 @@ daily pattern shifts (unusual events, season transitions).
 
 ### 3. Residual Autocorrelation — ACF & PACF
 **File:** `plots/diag_residual_acf.png`
+
+> *Run `notebooks/03_model_diagnostics.ipynb` to generate this image.*
 
 A 2 × 2 grid of autocorrelation plots:
 
@@ -464,6 +494,8 @@ the notebooks. They are referenced in the README for completeness.
 ### Training & Validation Loss Curves
 **File:** `outputs/comparison_curves.png`
 
+![Training and validation loss curves](outputs/comparison_curves.png)
+
 Two panels (one per model) showing training and validation MSE vs epoch. The key
 signal is whether validation loss converges smoothly or diverges from training
 loss (overfitting). Learning-rate reduction events appear as sudden downward kinks.
@@ -473,6 +505,8 @@ Early stopping saves the best checkpoint before validation loss degrades.
 
 ### Predicted vs Actual Scatter
 **File:** `outputs/comparison_scatter.png`
+
+![Predicted vs actual NO₂ scatter](outputs/comparison_scatter.png)
 
 5,000 randomly-sampled (actual, predicted) pairs from the test set, one scatter
 plot per model. Perfect predictions lie on the dashed diagonal. The tightness and
@@ -484,6 +518,8 @@ concentrations — exactly the anomaly events identified in Notebooks 01 and 02.
 
 ### Per-Site MAE Map
 **File:** `outputs/site_mae_map.png`
+
+![Per-site MAE map](outputs/site_mae_map.png)
 
 The monitoring stations from the site map (Notebook 01) re-plotted with dot colour
 now encoding each station's individual test-set MAE (yellow = accurate, red = high
