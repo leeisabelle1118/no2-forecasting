@@ -98,14 +98,22 @@ NO2 Forecasting/
 │   ├── transformer_no2.py    # Encoder-only Transformer (Vaswani et al. 2017)
 │   └── mamba_no2.py          # Mamba SSM (Gu & Dao 2023), pure-PyTorch
 ├── notebooks/
-│   └── 01_explore_airnow.ipynb   # EDA: site map, time series, diurnal cycle,
-│                                 #      missing data, model forward-pass check
+│   ├── 01_explore_airnow.ipynb   # EDA: site map, time series, diurnal cycle,
+│   │                             #      missing data, model forward-pass check
+│   ├── 02_no2_time_series.ipynb  # Extended time-series plots: top-N sites,
+│   │                             #      regional trends, seasonal overlays,
+│   │                             #      rolling averages, anomaly detection
+│   └── 03_model_diagnostics.ipynb # Diagnostics: error decomposition,
+│                                  #      attention weights, residual ACF/PACF
 ├── outputs/                  # Checkpoints (.pt), training history (.json),
 │                             # comparison plots (.png)  — gitignored
+├── plots/                    # EDA figures saved by the notebooks — gitignored
 ├── train.py                  # CLI training script (Transformer or Mamba)
+├── predict.py                # Load a checkpoint and forecast a date range
 ├── compare.py                # Load checkpoints, compare MSE/MAE, save plots
 ├── environment.yml           # Conda environment spec
 ├── requirements.txt          # pip fallback
+├── GRAPHS_GUIDE.md           # Plain-language guide to every plot (notebooks 01–03)
 └── LICENSE                   # MIT
 ```
 
@@ -148,6 +156,22 @@ python train.py --help
 Checkpoints are saved to `outputs/<model>_s<seq>_p<pred>_d<dim>.pt`.
 Training history (loss curves, test MSE/MAE) is saved as a JSON alongside.
 
+### Inference / prediction
+
+```bash
+# Forecast the last week of the test set using the best Transformer checkpoint
+python predict.py --model transformer
+
+# Forecast a specific date range and plot named sites
+python predict.py --model mamba --start 2024-08-01 --end 2024-08-07 \
+    --sites "Seattle-Beacon Hill" "Portland SE Lafayette"
+
+# List available site names
+python predict.py --list-sites
+```
+
+Saves per-site CSVs and time-series PNGs to `outputs/`.
+
 ### Compare models
 
 ```bash
@@ -160,7 +184,14 @@ Generates four files in `outputs/`:
 
 ## Exploratory Data Analysis (EDA)
 
-All plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_explore_airnow.ipynb).
+Core EDA plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_explore_airnow.ipynb).  
+Extended time-series visualisations (regional trends, seasonal overlays, rolling averages, anomaly detection) are in [`notebooks/02_no2_time_series.ipynb`](notebooks/02_no2_time_series.ipynb).  
+Model diagnostics (error decomposition, attention weights, residual ACF/PACF) are in [`notebooks/03_model_diagnostics.ipynb`](notebooks/03_model_diagnostics.ipynb).  
+All figures are saved to `plots/`.
+
+> **Full graph guide:** For a plain-language explanation of every chart across all
+> three notebooks — what each graph shows, how to read it, and why it matters for
+> NO₂ forecasting — see **[GRAPHS_GUIDE.md](GRAPHS_GUIDE.md)**.
 
 ---
 
@@ -209,9 +240,9 @@ This chart shows the average shape of a typical day's NO₂ levels, averaged acr
 
 ### Monthly seasonal pattern
 
-![Monthly seasonal NO₂ pattern](outputs/eda_monthly_seasonal.png)
+![Monthly seasonal NO₂ pattern](plots/monthly_boxplot.png)
 
-A bar chart where each bar is one month. The height of the bar shows the average NO₂ level across all stations during that month. This makes it easy to see seasonal trends — NO₂ is typically higher in winter months because there is less sunlight to break it down and more energy is burned for heating. Summer months tend to show lower NO₂ even though there is more traffic, because stronger sunlight destroys NO₂ faster.
+A box-and-whisker plot where each box represents one month. Rather than showing a single mean, each box shows the full distribution of monthly-mean NO₂ values **across all monitoring sites**: the centre line is the median, the box spans the interquartile range (IQR), whiskers extend to 1.5×IQR, and dots beyond the whiskers are outlier sites. This makes it easy to see both the seasonal trend and the spread between sites — winter months have higher medians because there is less sunlight to break down NO₂ and more energy burned for heating, while summer shows lower medians but often a wider spread due to wildfire events inflating certain sites.
 
 ---
 
@@ -317,6 +348,40 @@ Machine-readable summary of each model's test performance:
 MSE and MAE are in **normalised units** (each site divided by its training-set
 mean), so a MAE of 0.69 means predictions are off by ~69 % of the typical
 concentration at that site on average.
+
+---
+
+## Model Diagnostics
+
+Deep-dive diagnostics using the fully-trained checkpoints are in
+[`notebooks/03_model_diagnostics.ipynb`](notebooks/03_model_diagnostics.ipynb).
+All figures are saved to `plots/`.
+
+### Forecast error time decomposition
+
+![Forecast MAE by hour and month](plots/diag_error_decomp.png)
+
+Two grouped bar charts showing mean absolute error broken down by (left) hour of
+day and (right) month of year for both models. Reveals *when* each model makes
+its largest errors and whether errors correlate with the diurnal peaks and
+seasonal patterns identified in notebooks 01–02.
+
+### Attention weight heatmap
+
+![Transformer attention weights](plots/diag_attention_weights.png)
+
+One heatmap per Transformer encoder layer showing average self-attention weights
+over 200 test-set windows. Bright cells at column `t-24` confirm the model has
+learned to attend to the same hour from the previous day — the diurnal cycle
+identified in notebook 01.
+
+### Residual autocorrelation (ACF / PACF)
+
+![Residual ACF and PACF](plots/diag_residual_acf.png)
+
+2 × 2 grid (ACF and PACF for each model) at lags 0–48 hours. Spikes outside the
+95 % confidence band reveal unexplained temporal structure — particularly at lag 24
+(daily cycle) and lag 1–6 (short-range persistence).
 
 ### Python API
 
