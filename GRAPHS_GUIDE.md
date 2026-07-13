@@ -79,6 +79,8 @@ before any station filtering — informed the decision to impute short gaps
 ### 2. Site Map
 **File:** `outputs/eda_site_map.png`
 
+![AirNow monitoring site map](outputs/eda_site_map.png)
+
 A scatter plot of all ~197 monitoring stations on a US map. Each dot is one
 station, positioned at its actual latitude/longitude. Dot colour encodes the
 station's time-averaged NO₂ concentration (yellow = low, orange/red = high).
