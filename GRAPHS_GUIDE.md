@@ -1,4 +1,4 @@
-# NO₂ Forecasting — Graphs & Visualisations Guide
+# NO₂ Forecasting — Graphs & Visualizations Guide
 
 This document explains every graph produced across notebooks 01–03, what each one
 shows, and **why it matters for predicting NO₂**. The three notebooks form a
@@ -22,6 +22,19 @@ Notebook 01  →  Notebook 02  →  Notebook 03
 A forecasting model trained on data it does not understand will not generalise.
 Notebooks 01 and 02 build that understanding. Notebook 03 then checks whether the
 trained model has actually captured what the EDA revealed.
+
+---
+
+## File Location Convention
+
+Images in this project are saved to two directories:
+
+| Directory | Contents |
+|---|---|
+| `outputs/` | EDA figures from Notebook 01 (`eda_*.png`) and model comparison figures from `compare.py` (`comparison_*.png`, `site_mae_map.png`) |
+| `plots/` | Extended time-series figures from Notebook 02 (`ts_*.png`, `monthly_boxplot.png`) and model diagnostic figures from Notebook 03 (`diag_*.png`) |
+
+Both directories are tracked in git. Only `.pt` checkpoint files are excluded.
 
 ---
 
@@ -56,9 +69,10 @@ scheduled agency-wide maintenance window, or a data collection outage.
 Missing data directly affects training quality. A 24-hour look-back window that
 contains gaps will produce noisy input sequences. The heatmap identifies which
 time periods are safe to include in training and flags whether any stations should
-be dropped entirely. The ~13.7 % overall missing rate found here informed the
-decision to impute short gaps (≤ 3 hours) with linear interpolation rather than
-discard those windows.
+be dropped entirely. An overall missing rate of ~13.7 % across all station-hour
+pairs — computed as the fraction of NaN entries in the full sites × time matrix,
+before any station filtering — informed the decision to impute short gaps
+(≤ 3 hours) with linear interpolation rather than discard those windows.
 
 ---
 
@@ -71,9 +85,9 @@ station's time-averaged NO₂ concentration (yellow = low, orange/red = high).
 
 **What it shows:**
 - Spatial coverage: which parts of the country have sensors and which do not.
-- Urban vs rural contrast: red/orange dots cluster around cities (Seattle,
-  Portland, Denver) where traffic and industry dominate; yellow dots sit in rural
-  and coastal areas.
+- Urban vs rural contrast: red/orange dots are consistent with urban and
+  industrial areas (e.g. Seattle, Portland, Denver) where traffic and industry
+  are major emission sources; yellow dots sit in rural and coastal areas.
 - Network density: the western coverage is sparser than the east — this affects
   how well a spatially-aggregated forecast generalises.
 
@@ -87,23 +101,25 @@ also anchors the per-site error maps produced in Notebook 03.
 
 ---
 
-### 3. NO₂ Time Series — Representative Sites
+### 3. NO₂ Time Series: Representative Sites
 **File:** `outputs/eda_no2_time_series.png`
 
 ![NO₂ time series for representative sites](outputs/eda_no2_time_series.png)
 
 Three stacked line charts, each covering the full 15-month dataset (July 2023 –
-September 2024) at hourly resolution, for three automatically-selected stations:
+September 2024) at hourly resolution. Three stations are selected automatically
+by the following criteria:
 
-- **Top panel** — the station with the highest mean NO₂ (a busy urban/highway
-  site). Shows large-amplitude diurnal swings and occasional extreme spikes.
-- **Middle panel** — the station with the lowest mean NO₂ (likely a rural or
+- **Top panel** — highest mean NO₂ across the dataset (likely a busy urban or
+  highway-adjacent site). Shows large-amplitude diurnal swings and occasional
+  extreme spikes.
+- **Middle panel** — lowest mean NO₂ across the dataset (likely a rural or
   coastal location). Shows the same seasonal shape but much smaller amplitude.
-- **Bottom panel** — the station with the most complete data coverage. Shows
-  what a "clean" input sequence looks like.
+- **Bottom panel** — highest data coverage (fewest missing readings). Shows
+  what a clean, gap-free input sequence looks like.
 
 **Why it matters for forecasting:**
-This is the single most important sanity check before training. It confirms that
+One of the most important sanity checks before training. It confirms that
 the hourly temporal structure is intact, that the seasonal shape is visible, and
 that gaps appear as flat stretches (not as zeroes or artefacts that would silently
 corrupt training sequences). It also illustrates the dynamic range the model must
@@ -123,7 +139,9 @@ across stations.
 
 **What it shows:**
 The characteristic two-peak daily rhythm:
-- Morning peak (~13–15 UTC, or 5–7 AM Pacific) from rush-hour vehicle emissions.
+- Morning peak at UTC hours consistent with local rush hour across the network's
+  time zones (the exact UTC offset varies by station location and by daylight
+  saving time, so no single local-time translation applies to all sites).
 - Afternoon dip as UV sunlight photo-dissociates NO₂ into NO and O.
 - Slight evening rise from the evening commute.
 - Overnight minimum when traffic is lowest.
@@ -146,17 +164,18 @@ corresponding hour from the previous cycle.
 ![Monthly seasonal NO₂ pattern](plots/monthly_boxplot.png)
 
 A box-and-whisker plot with one box per calendar month. Each box summarises the
-distribution of monthly-mean NO₂ values *across all monitoring stations*:
-- Centre line = median across sites.
-- Box = interquartile range (IQR).
+distribution of station-level monthly means — each station contributes one value
+per month (its mean NO₂ for that month) — across all monitoring stations:
+- Centre line = median of station-level monthly means.
+- Box = interquartile range (IQR) across stations.
 - Whiskers = 1.5 × IQR.
-- Dots beyond whiskers = outlier sites.
+- Dots beyond whiskers = outlier stations for that month.
 
 **What it shows:**
 The seasonal rhythm: winter months (Dec–Feb) have higher medians because solar UV
 is weaker, the atmosphere is more stable (less vertical mixing), and home heating
-adds emissions. Summer months are lower on average but often show a wider spread
-because wildfire smoke can inflate certain sites.
+adds emissions. Summer months are lower on average but often show a wider spread,
+which may reflect events such as wildfires inflating certain sites.
 
 **Why it matters for forecasting:**
 Month-of-year is one of the strongest predictors of ambient NO₂. The seasonal
@@ -166,7 +185,7 @@ expectations for which months will be harder to forecast accurately.
 
 ---
 
-### 6. Daily Mean NO₂ Time Series — All Sites
+### 6. Daily Mean NO₂: All Sites
 **File:** `outputs/eda_daily_mean_all_sites.png`
 
 ![Daily mean NO₂ — all sites](outputs/eda_daily_mean_all_sites.png)
@@ -189,7 +208,7 @@ used in model evaluation.
 
 ---
 
-### 7. Daily Mean NO₂ — Single Site
+### 7. Daily Mean NO₂: Single Site
 **File:** `outputs/eda_daily_mean_site.png`
 
 ![Daily mean NO₂ — single site](outputs/eda_daily_mean_site.png)
@@ -325,9 +344,9 @@ Dashed red and blue horizontal lines mark the threshold levels.
 
 **What it shows:**
 The timing, frequency, and magnitude of pollution events (crimson) and
-unusually clean periods (blue). Clustered crimson bars often correspond to
-wildfires or temperature inversions; clusters of blue bars may reflect storms
-that flush pollutants away.
+unusually clean periods (blue). Clustered crimson bars may correspond to events
+such as wildfires or temperature inversions; clusters of blue bars may reflect
+conditions such as storms that flush pollutants away.
 
 **Why it matters for forecasting:**
 Anomalous days are the hardest test cases. A model that performs well on average
@@ -378,10 +397,12 @@ interrogation of the model's behaviour on held-out test data.
 Two grouped bar charts side by side, with Transformer (blue) and Mamba (orange)
 bars in each:
 
-**Left panel — MAE by hour of day (UTC)**
-The X-axis is the predicted hour (0–23 UTC). The Y-axis is mean absolute error
-in normalised units. Each bar shows the average error when forecasting a window
-that starts at that hour.
+**Left panel — MAE by first predicted hour (UTC)**
+The X-axis is the UTC hour of the first predicted timestep (= the input window
+start timestamp + `SEQ_LEN` hours, i.e. the first hour the model is actually
+forecasting). The Y-axis is mean absolute error in normalised units. Each bar
+shows the average error for all test windows whose first predicted hour falls at
+that UTC hour.
 
 **Right panel — MAE by month of year**
 The X-axis is calendar month (from the test set). Each bar shows the average
@@ -452,8 +473,8 @@ A 2 × 2 grid of autocorrelation plots:
 | **PACF** | Top-right | Bottom-right |
 
 Each plot shows autocorrelation (ACF) or partial autocorrelation (PACF) of the
-per-window mean residual (predicted − actual, averaged over all sites and forecast
-steps) at lags 0–48 hours. The blue shaded band is the 95 % confidence interval
+per-window mean signed error — (predicted − actual) averaged over the 6 forecast
+steps and all ~197 sites, yielding one scalar per test window — at lags 0–48 hours. The blue shaded band is the 95 % confidence interval
 under the null hypothesis of white noise. Spikes outside this band indicate
 statistically significant serial correlation.
 
@@ -486,8 +507,9 @@ increasing the look-back window could eliminate it.
 
 ## Model Comparison Plots (produced by `compare.py`)
 
-These outputs sit in `outputs/` and are produced after training, independent of
-the notebooks. They are referenced in the README for completeness.
+These plots summarise the final model comparison step. After training both models,
+run `python compare.py` from the project root to generate them. All outputs are
+saved to `outputs/`, independent of the notebooks.
 
 ---
 
