@@ -261,10 +261,12 @@ per-site mean normalisation applied before training.
 ![Regional NO₂ time series](plots/ts_regional.png)
 
 Three smoothed lines (daily mean resampled to daily, then plotted) showing the
-average NO₂ trajectory for stations in three geographic bands:
-- **West** (longitude < −105 °): Pacific coast + Rockies
-- **Central** (−105 ° to −85 °): Great Plains + Midwest
-- **East** (longitude ≥ −85 °): Eastern seaboard
+average NO₂ trajectory for stations in three geographic bands. The dataset covers
+roughly −128 ° to −100 ° longitude (Pacific NW to the Great Plains), so the
+boundaries are split into thirds of that range:
+- **West** (longitude < −118 °): Pacific coast + Sierra Nevada / Cascades (n ≈ 85)
+- **Central** (−118 ° to −108 °): Intermountain / Rockies (n ≈ 66)
+- **East** (longitude ≥ −108 °): Great Plains + eastern edge of coverage (n ≈ 31)
 
 **What it shows:**
 Regional synchrony and divergence. When all three lines move together, a
