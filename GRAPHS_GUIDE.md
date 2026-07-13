@@ -242,10 +242,20 @@ Daily-mean time series for the five stations with the highest average NO₂
 concentration (filtered to stations with ≥ 70 % data coverage to ensure complete
 traces). Each station is a separate coloured line.
 
+**Legend format:** Each entry shows `Station Name  [AQS_code  lat°N, lon°W]`,
+for example `60 Near Road  [060710027  34.03°N, 117.62°W]`. This makes it easy
+to look up any station on a map or cross-reference it with the README's site
+table. See the [README AQS site codes section](../README.md) for plain-English
+descriptions of the near-road and Globeville sites that commonly appear here.
+
 **What it shows:**
 The diversity of behaviour among high-pollution sites. Some follow a smooth
 seasonal arc; others have sharp spikes from industrial events. Lines that diverge
 from each other reveal that pollution is locally driven, not just weather-driven.
+The highest-ranking sites are typically near-road monitors (e.g. "60 Near Road",
+"710 Near Road") or urban environmental-justice neighbourhoods (e.g.
+"Globeville", Denver) — all locations where vehicle exhaust and industrial
+emissions are concentrated.
 
 **Why it matters for forecasting:**
 The per-station normalisation is validated here: if one site averages 40 PPB and

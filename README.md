@@ -46,6 +46,28 @@ maintenance or quality-control failures.
 - **Spatial variation** — Urban/industrial sites show much higher levels than
   rural monitors.
 
+**Understanding AQS site codes and notable site types:**
+
+Each monitoring station is identified by an **AQS (Air Quality System) site
+code** in the format `SSCCCNNNNN`:
+- `SS` — US state FIPS code (e.g. `06` = California, `08` = Colorado)
+- `CCC` — county FIPS code
+- `NNNNN` — unique site number within the county
+
+Two site types that appear prominently in this dataset:
+
+| Site name | AQS code | Location | What it is |
+|---|---|---|---|
+| **60 Near Road** | `060710027` | Pomona/Ontario, CA (34.03°N, 117.62°W) | Placed next to **State Route 60** (a major LA-area freeway). "Near Road" is a formal EPA station type — sensors sited directly beside high-traffic roads to measure vehicle-exhaust NO₂, which can be 2–3× higher than background levels just a few hundred metres away. |
+| **710 Near Road** | `060374008` | Lynwood, CA (33.86°N, 118.20°W) | Same concept — positioned next to **Interstate 710** (Long Beach freeway), one of the busiest freight corridors in the US. |
+| **Anaheim Near Road** | `060590008` | Anaheim, CA (33.82°N, 117.92°W) | Near-road monitor beside a major Anaheim arterial. |
+| **Ontario Near Road** | `060710026` | Ontario, CA (34.07°N, 117.53°W) | Near-road monitor in the Inland Empire freight hub. |
+| **Portland Near Road** | `410670005` | Portland, OR (45.40°N, 122.75°W) | Near-road monitor on a major Portland corridor. |
+| **Globeville** | `080310028` | Denver, CO (39.79°N, 104.99°W) | A neighbourhood in north Denver at the confluence of I-25 and I-70. Historically one of Colorado's most polluted communities — a well-known **environmental justice** site with heavy industrial and highway exposure. |
+
+These sites tend to record the **highest NO₂ values** in the dataset and
+therefore appear frequently in "top sites" plots.
+
 ---
 
 ### TEMPO — Satellite NO₂ column measurements (companion dataset)
