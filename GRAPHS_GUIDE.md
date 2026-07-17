@@ -1,27 +1,29 @@
 # NO₂ Forecasting — Graphs & Visualizations Guide
 
-This document explains every graph produced across notebooks 01–03, what each one
-shows, and **why it matters for predicting NO₂**. The three notebooks form a
+This document explains every graph produced across notebooks 01–04, what each one
+shows, and **why it matters for predicting NO₂**. The notebooks form a
 deliberate pipeline: explore the raw data → understand the temporal structure →
-diagnose the trained models.
+diagnose the trained models → evaluate GraphMamba predictions against ground truth.
 
 ---
 
 ## The Big Picture: How the Notebooks Connect
 
 ```
-Notebook 01  →  Notebook 02  →  Notebook 03
-(Data Quality   (Temporal        (Model
- & Spatial       Structure)       Diagnostics)
- Exploration)
-     ↓               ↓               ↓
- Know WHAT        Know WHEN       Know WHERE
- data you have    patterns exist  the model fails
+Notebook 01  →  Notebook 02  →  Notebook 03  →  Notebook 04
+(Data Quality   (Temporal        (Model           (LA Basin
+ & Spatial       Structure)       Diagnostics)     GraphMamba vs
+ Exploration)                                      AirNow Obs)
+     ↓               ↓               ↓                  ↓
+ Know WHAT        Know WHEN       Know WHERE        Know HOW WELL
+ data you have    patterns exist  the model fails   the model predicts
 ```
 
 A forecasting model trained on data it does not understand will not generalise.
-Notebooks 01 and 02 build that understanding. Notebook 03 then checks whether the
-trained model has actually captured what the EDA revealed.
+Notebooks 01 and 02 build that understanding. Notebook 03 checks whether the
+trained model has actually captured what the EDA revealed. Notebook 04 closes the
+loop: it overlays GraphMamba's LA Basin predictions against co-located AirNow
+observations for the Jul–Sep 2024 inference window.
 
 ---
 
@@ -588,3 +590,116 @@ local variability is the main driver of forecast difficulty.
 | Loss curves | compare.py | Training health and overfitting detection |
 | Predicted vs actual | compare.py | Overall accuracy and handling of extremes |
 | Per-site MAE map | compare.py | Spatial pattern of forecast error |
+| LA Basin site map (GraphMamba) | 04 | Which sites were covered in inference |
+| Hourly TS: predicted vs observed | 04 | Model accuracy at Anaheim & Ontario Near Road |
+| Daily aggregated comparison | 04 | Smoothed trend; directly comparable to AQS data |
+| Scatter: all LA Basin sites | 04 | Overall bias, variance, and outlier behaviour |
+| Spatial RMSE map | 04 | Which LA Basin sites the model struggles with most |
+
+---
+
+## Notebook 04 — `04_graphmamba_vs_observed.ipynb`
+### GraphMamba Predicted vs AirNow Observed NO₂ — LA Basin
+
+**Source file:** `/mnt/data3/GraphMamba/output/test/predictions.nc`  
+**Inference period:** 2024-07-01 → 2024-09-30 (hourly, TEMPO-paced)  
+**Sites:** 21 South Coast AQMD stations inside the LA Basin bounding box  
+**Output directory:** `no2 analysis/outputs/gm04_*.png` and `gm04_la_site_metrics.csv`
+
+> The `observed_no2` field in predictions.nc comes from the **AirNow** network
+> (hourly raw concentration). It is a different instrument network than the EPA AQS
+> daily summaries used in Notebooks 01–03 and the LA Basin analysis.
+
+---
+
+### 1. LA Basin Sites Map
+**File:** `no2 analysis/outputs/gm04_la_sites_map.png`
+
+A Cartopy map showing all 21 LA Basin inference sites coloured by their mean
+AirNow NO₂ over the inference period (yellow = low, orange/red = high). The same
+enhanced base map is used throughout: urban footprints, county boundaries, major
+roads, rivers, and city labels.
+
+**What it shows:** Spatial coverage of the GraphMamba inference — whether the
+model was evaluated on both low-NO₂ coastal sites and high-NO₂ near-road sites.
+
+**Why it matters:** A model that only performs well on low-NO₂ suburban sites is
+not useful for air quality management, which is most concerned with hotspots.
+
+---
+
+### 2. Hourly Time Series — Predicted vs AirNow Observed
+**Files:** `no2 analysis/outputs/gm04_ts_anaheim.png`, `gm04_ts_ontario.png`
+
+For each focus site, a 2-row figure:
+- **Top:** Hourly AirNow observed NO₂ (coloured scatter) vs GraphMamba predicted
+  NO₂ (red dashed line) over the full Jul–Sep 2024 inference window.
+- **Bottom:** Cartopy inset map locating the site in the LA Basin.
+
+Metrics box (RMSE, MAE, R², N valid) printed in the top-left corner.
+
+**What to look for:**
+- Does the model capture the diurnal cycle amplitude?
+- Are multi-day pollution episodes (elevated NO₂ lasting 3–5 days) reproduced?
+- Is the model biased high or low relative to AirNow?
+
+**Why it matters:** Hourly resolution reveals whether the model is exploiting the
+TEMPO column signal at intra-day timescales, not just producing a smooth daily mean.
+
+---
+
+### 3. Daily Aggregated Comparison
+**Files:** `no2 analysis/outputs/gm04_daily_anaheim.png`, `gm04_daily_ontario.png`
+
+Hourly values are aggregated to daily means (requiring ≥ 4 valid observations per
+day). The two lines — observed and predicted — are directly comparable to the AQS
+daily series in the `ts_*.png` figures from `la_basin_no2_analysis.ipynb`.
+
+**What to look for:**
+- Multi-day pollution episodes (elevated NO₂ for 3–5 consecutive days): does the
+  model correctly time onset and recovery?
+- Weekend dip: is traffic reduction on weekends captured?
+
+---
+
+### 4. Scatter — All LA Basin Sites
+**File:** `no2 analysis/outputs/gm04_scatter_all_sites.png`
+
+A hexbin density scatter plot of all valid (observed, predicted) hourly pairs
+pooled across all 21 LA Basin sites. The 1:1 line is shown; the annotation box
+lists overall RMSE, MAE, R², and total N.
+
+**Interpretation:**
+- Points above 1:1 → over-prediction (model sees high TEMPO column but ground NO₂ is lower).
+- Points below 1:1 → under-prediction (local source not captured by TEMPO).
+- A dense cluster near the origin with a wide high-value scatter is typical for
+  near-road sites where traffic spikes are episodic and hard to predict.
+
+---
+
+### 5. Spatial RMSE Map
+**File:** `no2 analysis/outputs/gm04_la_rmse_map.png`
+
+Each LA Basin site is coloured by its per-site hourly RMSE (green = low error,
+red = high error). Site name and RMSE value are annotated.
+
+**What to look for:**
+- Are near-road sites (Ontario, 710 Near Road) consistently higher RMSE?
+- Are coastal/upwind sites (West LA, Reseda) lower RMSE?
+- Any unexpected high-error sites that warrant investigation?
+
+**Why it matters:** Identifies which geographic areas the model struggles with
+most — this is the starting point for targeted model improvement (e.g., adding
+traffic-density features or road-proximity covariates).
+
+---
+
+### 6. Per-Site Metrics Table
+**File:** `no2 analysis/outputs/gm04_la_site_metrics.csv`
+
+CSV with one row per LA Basin site, sorted by RMSE ascending. Columns:
+`Site`, `Lat`, `Lon`, `RMSE (PPB)`, `MAE (PPB)`, `R²`, `N (valid obs)`.
+
+> See also: `no2 analysis/outputs/LA_BASIN_GRAPHS_GUIDE.md` for a detailed
+> stand-alone guide to all LA Basin figures from both the AQS analysis and the
+> GraphMamba evaluation.

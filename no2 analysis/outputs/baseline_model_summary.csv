@@ -1,0 +1,5 @@
+Model,Prediction,RMSE,MAE,R²,Best for
+Mean Model,15.21 ppb (constant),6.602,5.257,0.0,Lowest RMSE among constant baselines
+Median Model,13.11 ppb (constant),6.929,4.997,-0.1015,Lowest MAE among constant baselines
+Mode Model,9.9 ppb (constant),8.472,5.955,-0.6467,Most-frequent-value baseline
+Persistence Model,Yesterday's observed value,4.77,3.528,0.4779,"Best overall (RMSE, MAE & R²)"
