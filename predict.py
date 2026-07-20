@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     import torch
-    from data.load_airnow import load_all, load_sequences, site_meta, DATA_DIR, TRAIN_END, VAL_END
+    from data.load_airnow import load_all, load_sequences, site_meta, DATA_DIR, TRAIN_END, FULL_TRAIN_END, get_train_mean
     from models.transformer_no2 import NO2Transformer, _make_loader
     from models.mamba_no2 import NO2Mamba
     from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -103,18 +103,18 @@ def main():
     df_raw = load_all(data_dir)                          # (n_hours, n_sites) PPB
     X, y, timestamps, sites = load_sequences(
         data_dir, seq_len=seq_len, pred_len=pred_len,
-        normalize=True, norm_end=str(TRAIN_END))
+        normalize=True, norm_end=str(FULL_TRAIN_END))  # normalize by full 12-month training window
 
     ts      = pd.to_datetime(timestamps)
     n       = len(X)
     n_sites = X.shape[2]
 
-    # Default window: test set (starts after VAL_END)
+    # Default window: test set (starts after FULL_TRAIN_END, which marks the end of the 12-month training window)
     if args.start:
         start_dt = pd.Timestamp(args.start)
         idx0 = int(np.searchsorted(ts, start_dt))
     else:
-        idx0 = int((ts > VAL_END).argmax())
+        idx0 = int((ts > FULL_TRAIN_END).argmax())
 
     if args.end:
         end_dt = pd.Timestamp(args.end) + pd.Timedelta(hours=23)
@@ -200,10 +200,8 @@ def main():
     print(f"\nGenerating plots for {len(plot_codes)} site(s) …")
 
     # Recover per-site training mean for de-normalisation
-    arr_all = load_all(data_dir).fillna(0).clip(lower=0).values.astype("float32")
-    split   = int(len(arr_all) * 0.8)
-    train_mean = arr_all[:split].mean(axis=0)                      # (n_sites,)
-    train_mean = np.where(train_mean == 0, 1.0, train_mean)
+    # Use the actual full 12-month training period (FULL_TRAIN_END includes both training-proper and validation)
+    train_mean = get_train_mean(data_dir, train_end=str(FULL_TRAIN_END))  # (n_sites,)
 
     for code in plot_codes:
         if code not in sites:

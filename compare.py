@@ -110,9 +110,9 @@ def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: 
     """Per-site MAE overlaid on a Cartopy geographic map."""
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
-    from data.load_airnow import site_meta, DATA_DIR, load_sequences, TRAIN_END
+    from data.load_airnow import site_meta, DATA_DIR, load_sequences, FULL_TRAIN_END
 
-    _, _, _, sites = load_sequences(seq_len=24, pred_len=6, norm_end=str(TRAIN_END))   # for site codes
+    _, _, _, sites = load_sequences(seq_len=24, pred_len=6, norm_end=str(FULL_TRAIN_END))   # for site codes
     meta = site_meta(DATA_DIR)
     common = [s for s in sites if s in meta.index]
     site_idx = [sites.index(s) for s in common]
@@ -183,7 +183,7 @@ def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: 
 def main():
     import torch
     import torch.nn as nn
-    from data.load_airnow import load_sequences, DATA_DIR, site_meta, TRAIN_END, VAL_END
+    from data.load_airnow import load_sequences, DATA_DIR, site_meta, TRAIN_END, FULL_TRAIN_END, get_train_mean
     from models.transformer_no2 import NO2Transformer, evaluate
     from models.mamba_no2 import NO2Mamba
     from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -250,9 +250,9 @@ def main():
     print("Loading test data …")
     X, y, timestamps, sites = load_sequences(
         seq_len=ref_meta["seq_len"], pred_len=ref_meta["pred_len"],
-        norm_end=str(TRAIN_END))
+        norm_end=str(FULL_TRAIN_END))  # normalize by full 12-month training window
     ts       = pd.to_datetime(timestamps)
-    idx_test = ts > VAL_END
+    idx_test = ts > FULL_TRAIN_END  # test set starts after 12-month training window
     X_test   = X[idx_test]
     y_test   = y[idx_test]
     print(f"Test set: {idx_test.sum():,} windows  "

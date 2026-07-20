@@ -31,7 +31,7 @@ import torch.nn as nn
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-from data.load_airnow import load_sequences, DATA_DIR, TRAIN_END, VAL_END
+from data.load_airnow import load_sequences, DATA_DIR, TRAIN_END, FULL_TRAIN_END, get_train_mean
 from models.transformer_no2 import NO2Transformer, _make_loader, evaluate
 from models.mamba_no2 import NO2Mamba
 from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -62,11 +62,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--patience",   type=int, default=8,
                    help="Early-stopping patience (epochs without val improvement)")
     p.add_argument("--train-end", default=str(TRAIN_END.date()),
-                   help="Last date of training set YYYY-MM-DD "
-                        "(default: %(default)s = end of month 10 of 15)")
-    p.add_argument("--val-end",   default=str(VAL_END.date()),
-                   help="Last date of validation set YYYY-MM-DD "
-                        "(default: %(default)s → test = Jul–Sep 2024)")
+                   help="Last date of training-proper (before validation) YYYY-MM-DD "
+                        "(default: %(default)s = 11 months of training data)")
+    p.add_argument("--val-end",   default=str(FULL_TRAIN_END.date()),
+                   help="Last date of validation split YYYY-MM-DD "
+                        "(default: %(default)s = end of 12-month training window → test = Jul–Sep 2024)")
     p.add_argument("--fill-nan",   type=float, default=0.0)
     p.add_argument("--no-norm",    action="store_true",
                    help="Disable per-site normalisation")
@@ -153,14 +153,20 @@ def main():
     OUTPUTS.mkdir(exist_ok=True)
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"\n{'='*60}")
-    print(f"  Model   : {args.model}")
-    print(f"  Device  : {device}")
-    print(f"  Seq/Pred: {args.seq_len}h look-back → {args.pred_len}h forecast")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*70}")
+    print(f"  Model        : {args.model}")
+    print(f"  Device       : {device}")
+    print(f"  Seq/Pred     : {args.seq_len}h look-back → {args.pred_len}h forecast")
+    print(f"  ==== 12-MONTH TRAINING WINDOW ====")
+    print(f"  Train-proper : 2023-07-01 → {args.train_end}")
+    print(f"  Validation   : {(pd.Timestamp(args.train_end) + pd.Timedelta(days=1)).date()} → {args.val_end}")
+    print(f"  ==== 3-MONTH TEST WINDOW ====")
+    print(f"  Test period  : {(pd.Timestamp(args.val_end) + pd.Timedelta(days=1)).date()} → 2024-09-30")
+    print(f"{'='*70}\n")
 
     # ── Data ──────────────────────────────────────────────────────────────────
     print("Loading data …")
+    val_end_ts    = pd.Timestamp(args.val_end   + " 23:00")
     X, y, timestamps, sites = load_sequences(
         args.data_dir,
         seq_len=args.seq_len,
@@ -168,13 +174,12 @@ def main():
         stride=args.stride,
         fill_nan=args.fill_nan,
         normalize=not args.no_norm,
-        norm_end=args.train_end + " 23:00",
+        norm_end=str(val_end_ts),  # normalize by full 12-month training window
     )
     n_sites = X.shape[2]
 
     ts            = pd.to_datetime(timestamps)
     train_end_ts  = pd.Timestamp(args.train_end + " 23:00")
-    val_end_ts    = pd.Timestamp(args.val_end   + " 23:00")
 
     idx_train = ts <= train_end_ts
     idx_val   = (ts > train_end_ts) & (ts <= val_end_ts)
@@ -243,6 +248,13 @@ def main():
 
     # ── Save history ──────────────────────────────────────────────────────────
     hist_path = OUTPUTS / ckpt_name.replace(".pt", "_history.json")
+    train_start_ts = ts[idx_train][0]
+    train_end_ts_actual = ts[idx_train][-1]
+    val_start_ts = ts[idx_val][0] if idx_val.sum() > 0 else None
+    val_end_ts_actual = ts[idx_val][-1] if idx_val.sum() > 0 else None
+    test_start_ts = ts[idx_test][0]
+    test_end_ts_actual = ts[idx_test][-1]
+    
     meta = {
         "model": args.model, "n_sites": n_sites,
         "seq_len": args.seq_len, "pred_len": args.pred_len,
@@ -250,11 +262,25 @@ def main():
         "n_params": n_params,
         "k_nn": args.k_nn if args.model == "gnn" else None,
         "split": {
-            "train_end": args.train_end,
-            "val_end":   args.val_end,
-            "n_train":   int(idx_train.sum()),
-            "n_val":     int(idx_val.sum()),
-            "n_test":    int(idx_test.sum()),
+            "train_end_boundary": str(args.train_end),
+            "val_end_boundary": str(args.val_end),
+            "full_training_period": f"2023-07-01 → {args.val_end} (12 months)",
+            "test_period": "2024-07-01 → 2024-09-30 (3 months)",
+            "train": {
+                "start": str(train_start_ts.date()),
+                "end": str(train_end_ts_actual.date()),
+                "n_windows": int(idx_train.sum()),
+            },
+            "val": {
+                "start": str(val_start_ts.date()) if val_start_ts is not None else None,
+                "end": str(val_end_ts_actual.date()) if val_end_ts_actual is not None else None,
+                "n_windows": int(idx_val.sum()),
+            },
+            "test": {
+                "start": str(test_start_ts.date()),
+                "end": str(test_end_ts_actual.date()),
+                "n_windows": int(idx_test.sum()),
+            },
         },
         "test_mse": test_mse, "test_mae": test_mae,
         "history": history,

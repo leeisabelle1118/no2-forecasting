@@ -168,23 +168,26 @@ pip install mamba-ssm causal-conv1d
 The dataset covers **2023-07-01 → 2024-09-30** (15 complete months, 10 992 h).  
 All three models (Transformer, Mamba, GNN) use the **same chronological, leak-free split**:
 
-| Partition | Date range | Months | Hours |
+| Partition | Date range | Duration | Windows |
 |---|---|---|---|
-| **Train** | 2023-07-01 → 2024-04-30 | 10 | ~7 320 |
-| **Validation** | 2024-05-01 → 2024-06-30 | 2 | ~1 464 |
-| **Test** | 2024-07-01 → 2024-09-30 | 3 | ~2 208 |
+| **Training-proper** | 2023-07-01 → 2024-05-31 | 11.2 months | 8,064 |
+| **Validation** | 2024-06-01 → 2024-06-30 | 1.0 month | 720 |
+| **Test** | 2024-07-01 → 2024-09-30 | 3.1 months | 2,179 |
 
-*Train + Val = 12 months. Test = final 3 months (never touched during training or tuning).*
+**Key design principles:**
+- **Full training window** = 2023-07-01 → 2024-06-30 (12 months, 8,784 windows)
+- **Validation is held-out from within the training window** (2024-06-01 → 2024-06-30, 1 month) to detect overfitting
+- **Test is completely separate** (2024-07-01 → 2024-09-30, never touched during training or tuning)
 
 Windows are assigned by **start timestamp** (not row fraction), so the split is reproducible and identical regardless of `--seq-len` or `--stride`.  
-Per-site normalisation is computed **exclusively on training-period data** (`norm_end="2024-04-30 23:00"`) to prevent look-ahead leakage.
+Per-site normalisation is computed **exclusively on the full 12-month training window** (up to 2024-06-30 23:00) to prevent look-ahead leakage.
 
 ---
 
 ### Training (CLI)
 
 ```bash
-# Train Transformer for 50 epochs (default split: train→2024-04-30, val→2024-06-30)
+# Train Transformer for 50 epochs (default split: train-proper→2024-05-31, val→2024-06-30, test→2024-07-01+)
 python train.py --model transformer
 
 # Train Mamba with a 48-hour look-back and 12-hour forecast

@@ -32,13 +32,43 @@ DATA_DIR = "/mnt/data3/AirNow"
 
 # ── Canonical time-series split boundaries (UTC, inclusive ends) ───────────────
 # Dataset: 2023-07-01 → 2024-09-30  (15 months, 10 992 h)
-# Train   : 2023-07-01 → 2024-04-30  (10 months)
-# Val     : 2024-05-01 → 2024-06-30  ( 2 months)  ╮ = 12-month
-# Test    : 2024-07-01 → 2024-09-30  ( 3 months)  ╯   training window
+# Full 12-month training window (split into train-proper & validation):
+# Train-proper : 2023-07-01 → 2024-05-31  (11 months) ┐
+# Validation   : 2024-06-01 → 2024-06-30  ( 1 month ) ┤ = 12 months (training data)
+# Test        : 2024-07-01 → 2024-09-30  ( 3 months) ┘
 #
 # Windows are assigned by *start* timestamp — chronological, leak-free.
-TRAIN_END = pd.Timestamp("2024-04-30 23:00")   # last train-window start-hour
-VAL_END   = pd.Timestamp("2024-06-30 23:00")   # last val-window start-hour
+TRAIN_END       = pd.Timestamp("2024-05-31 23:00")   # last training-proper window start-hour
+FULL_TRAIN_END  = pd.Timestamp("2024-06-30 23:00")   # last validation window start-hour (end of 12-month training)
+
+
+def get_train_mean(data_dir: str = DATA_DIR, train_end: str | None = None) -> np.ndarray:
+    """Compute the mean NO2 during the entire 12-month training period.
+    
+    By default, computes mean over the full 12-month training window (training-proper + validation).
+    This ensures both training and validation data are normalized by the same reference.
+    
+    Parameters
+    ----------
+    data_dir  : path to AirNow NetCDF folder
+    train_end : timestamp string (e.g. "2024-06-30 23:00") marking the last training hour
+                (defaults to FULL_TRAIN_END to include full 12-month training window)
+    
+    Returns
+    -------
+    mean : float32 array of shape (n_sites,) with per-site mean from training period
+    """
+    if train_end is None:
+        train_end_ts = FULL_TRAIN_END  # default: full 12-month training period
+    else:
+        train_end_ts = pd.Timestamp(train_end)
+    
+    df = load_all(data_dir).clip(lower=0.0)
+    df_train = df[df.index <= train_end_ts]
+    # Use nanmean to ignore NaN values, then fill remaining NaNs with 1.0
+    mean = np.nanmean(df_train.values.astype("float32"), axis=0)
+    mean = np.where(np.isnan(mean), 1.0, mean)  # avoid /0 and NaN
+    return mean
 
 
 def _nc_files(data_dir: str = DATA_DIR):
