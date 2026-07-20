@@ -34,6 +34,8 @@
 - **Key features:** LA basin and Houston appear orange; rural plains green; Northeast corridor yellow-orange
 - **Use case:** Reference baseline for comparing model predictions
 
+![Observed NO₂ Concentrations](cartopy_observed_no2.png)
+
 #### 2. **cartopy_transformer_pred_no2.png**
 - **What it shows:** Transformer model predictions of NO₂ concentrations (same test period)
 - **Color scale:** Viridis, 0–23.75 PPB (Transformer's prediction range)
@@ -41,12 +43,16 @@
 - **Spatial accuracy:** ~85% color intensity match with observed map
 - **Key insight:** Transformer captures pollution hotspots accurately without significant over/underprediction
 
+![Transformer NO₂ Predictions](cartopy_transformer_pred_no2.png)
+
 #### 3. **cartopy_mamba_pred_no2.png**
 - **What it shows:** Mamba model predictions of NO₂ concentrations (same test period)
 - **Color scale:** Viridis, 0–29.97 PPB (Mamba's prediction range)
 - **Quality assessment:** ⚠️ **Predictions more conservative** — Yellow/green where Transformer shows orange; wider color scale suggests variable predictions
 - **Spatial accuracy:** ~75% color intensity match with observed map
 - **Key insight:** Mamba systematically underpredicts pollution in high-concentration areas despite wider prediction range
+
+![Mamba NO₂ Predictions](cartopy_mamba_pred_no2.png)
 
 ---
 
@@ -63,6 +69,8 @@
 - **Key insight:** Transformer has consistently low errors; only urban industrial areas show orange
 - **Quality:** 🥇 **Superior error profile** — error dominance in yellow indicates accurate predictions
 
+![Transformer Error Map (MAE)](cartopy_transformer_mae.png)
+
 #### 5. **cartopy_mamba_mae.png**
 - **What it shows:** Per-station mean absolute error (MAE) for Mamba predictions in normalized units
 - **Color scale:** Yellow-Orange-Red, 0–1.718 normalized units (Mamba error range)
@@ -73,6 +81,8 @@
 - **Geographic pattern:** More **orange and red** throughout, especially in high-pollution zones
 - **Key insight:** Mamba shows higher errors across most regions; wider error scale needed for same data
 - **Quality:** ⚠️ **Weaker error profile** — more red zones indicate less accurate predictions
+
+![Mamba Error Map (MAE)](cartopy_mamba_mae.png)
 
 ---
 
@@ -89,6 +99,8 @@
 - **Key insight:** 🥇 **Well-calibrated** — predictions are unbiased; no systematic over/underprediction
 - **Quality:** Transformer is reliable for operational use; predictions won't consistently over or underestimate
 
+![Transformer Bias Map](cartopy_transformer_bias.png)
+
 #### 7. **cartopy_mamba_bias.png**
 - **What it shows:** Per-station systematic bias (predicted NO₂ − observed NO₂) in PPB
 - **Color scale:** Red-Blue diverging, −15.30 to +15.30 PPB (centered at white = 0)
@@ -96,6 +108,8 @@
 - **Geographic pattern:** Predominantly **blue** with scattered red
 - **Key insight:** ⚠️ **Systematic underprediction** — Mamba consistently predicts lower than actual across most regions
 - **Quality:** Mamba bias is directional (blue = too low); unsuitable for high-stakes pollution forecasting
+
+![Mamba Bias Map](cartopy_mamba_bias.png)
 
 ---
 
@@ -116,6 +130,8 @@
   - Mamba: Orange points scatter more; visible trend below diagonal → **Underpredicts, less accurate**
 - **Use case:** Quick visual comparison of model calibration
 
+![Predicted vs Actual Scatter Plot](comparison_scatter.png)
+
 #### 9. **comparison_curves.png**
 - **What it shows:** Training and validation loss curves for both models during training phase
 - **Plot contains:**
@@ -132,12 +148,16 @@
   - Mamba: Converges around epoch 11 but validation loss remains higher
 - **Use case:** Understand training dynamics and model stability
 
+![Training and Validation Loss Curves](comparison_curves.png)
+
 #### 10. **site_mae_map.png**
 - **What it shows:** Heatmap of mean absolute error across all 197 monitoring stations
 - **Purpose:** Identify which geographic regions have the highest forecast errors (data quality or hard-to-predict areas)
 - **Color scheme:** Warm colors (red) indicate high error; cool colors (blue) indicate low error
 - **Key insight:** Error hotspots concentrate in urban industrial regions (LA, Houston, Chicago); rural areas have lower errors
 - **Use case:** Identify regions needing improved data collection or hyperparameter tuning
+
+![Per-Site Error Heatmap](site_mae_map.png)
 
 ---
 
@@ -155,11 +175,15 @@ Each file shows predicted vs actual NO₂ over the full 3-month test period for 
 - **Visual quality:** 🥇 **Excellent** — Transformer tracks observed peaks closely; minimal lag; captures pollution events accurately
 - **Pattern:** Visible summer peaks (July-August) followed by declining trend (September) — model captures seasonal pattern
 
+![Forecast Site 124000100112 (LA Basin)](forecast_124000100112_transformer.png)
+
 #### 12. **forecast_124000100126_transformer.png**
 - **Location:** Southern California (high-pollution area)
 - **Time span:** July 1 — September 30, 2024
 - **Visual quality:** 🥇 **Excellent** — Closely follows observed; good event detection; minimal systematic bias
 - **Pattern:** Summer pollution peaks well-captured; autumn decline accurate
+
+![Forecast Site 124000100126 (Southern CA)](forecast_124000100126_transformer.png)
 
 #### 13. **forecast_000100119_transformer.png**
 - **Location:** Eastern site (moderate-pollution area)
@@ -167,11 +191,15 @@ Each file shows predicted vs actual NO₂ over the full 3-month test period for 
 - **Visual quality:** 🥇 **Very good** — Predictions align well with observations; minor lag during sharp transitions
 - **Pattern:** Lower baseline pollution; Transformer captures variability well
 
+![Forecast Site 000100119 (Eastern)](forecast_000100119_transformer.png)
+
 #### 14. **forecast_000101005_transformer.png**
 - **Location:** Central site (moderate-pollution area)
 - **Time span:** July 1 — September 30, 2024
 - **Visual quality:** 🥇 **Very good** — Accurate tracking; minor underprediction during peaks
 - **Pattern:** Stable baseline with episodic pollution events; model captures most events
+
+![Forecast Site 000101005 (Central)](forecast_000101005_transformer.png)
 
 #### 15. **forecast_490472002_transformer.png**
 - **Location:** Texas site (moderate-pollution area)
@@ -179,11 +207,15 @@ Each file shows predicted vs actual NO₂ over the full 3-month test period for 
 - **Visual quality:** 🥇 **Good** — Generally accurate; some lag during sharp pollution spikes
 - **Pattern:** Episodic pollution; Transformer responds with delay to rapid changes
 
+![Forecast Site 490472002 (Texas)](forecast_490472002_transformer.png)
+
 #### 16. **forecast_060376012_transformer.png**
 - **Location:** Northeast site (high-pollution corridor)
 - **Time span:** July 1 — September 30, 2024
 - **Visual quality:** 🥇 **Excellent** — Very close match to observed; captures pollution events; minimal error
 - **Pattern:** Higher baseline; dense urban area; Transformer handles complexity well
+
+![Forecast Site 060376012 (Northeast)](forecast_060376012_transformer.png)
 
 **Summary:** All 6 Transformer forecasts show accurate predictions with minimal systematic bias. Predictions lag during sharp changes but recover quickly.
 
