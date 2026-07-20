@@ -6,3 +6,4 @@ netCDF4>=1.7
 matplotlib>=3.9
 scikit-learn>=1.4
 tqdm>=4.66
+cartopy>=0.23
