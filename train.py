@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 from data.load_airnow import load_sequences, DATA_DIR
 from models.transformer_no2 import NO2Transformer, _make_loader, evaluate
 from models.mamba_no2 import NO2Mamba
+from models.gnn_no2 import NO2GNN, build_knn_adj
 
 OUTPUTS = ROOT / "outputs"
 
@@ -43,7 +44,7 @@ OUTPUTS = ROOT / "outputs"
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train NO₂ Forecasting model")
-    p.add_argument("--model",      choices=["transformer", "mamba"],
+    p.add_argument("--model",      choices=["transformer", "mamba", "gnn"],
                    default="transformer", help="Architecture to train")
     p.add_argument("--data-dir",   default=DATA_DIR, help="AirNow NetCDF folder")
     p.add_argument("--seq-len",    type=int, default=24,  help="Look-back window (hours)")
@@ -51,7 +52,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--stride",     type=int, default=1,   help="Sliding window stride")
     p.add_argument("--d-model",    type=int, default=128, help="Model hidden dimension")
     p.add_argument("--n-layers",   type=int, default=None,
-                   help="Encoder layers (default: 2 for Transformer, 3 for Mamba)")
+                   help="Encoder layers (default: 2 for Transformer/GNN, 3 for Mamba)")
+    p.add_argument("--k-nn",       type=int, default=5,
+                   help="k-nearest neighbours for GNN graph construction (default 5)")
     p.add_argument("--epochs",     type=int, default=50)
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--lr",         type=float, default=1e-3)
@@ -176,17 +179,24 @@ def main():
     print(f"  Test  : {len(X_test):,} windows\n")
 
     # ── Model ─────────────────────────────────────────────────────────────────
-    n_layers_default = {"transformer": 2, "mamba": 3}
+    n_layers_default = {"transformer": 2, "mamba": 3, "gnn": 2}
     n_layers = args.n_layers or n_layers_default[args.model]
 
     if args.model == "transformer":
         model = NO2Transformer(n_sites=n_sites, seq_len=args.seq_len,
                                pred_len=args.pred_len, d_model=args.d_model,
                                n_layers=n_layers)
-    else:
+    elif args.model == "mamba":
         model = NO2Mamba(n_sites=n_sites, seq_len=args.seq_len,
                          pred_len=args.pred_len, d_model=args.d_model,
                          n_layers=n_layers)
+    else:  # gnn
+        from data.load_airnow import site_meta
+        meta = site_meta(args.data_dir)
+        adj  = build_knn_adj(meta["lat"].values, meta["lon"].values, k=args.k_nn)
+        model = NO2GNN(n_sites=n_sites, seq_len=args.seq_len,
+                       pred_len=args.pred_len, d_model=args.d_model,
+                       n_layers=n_layers, k_nn=args.k_nn, adj=adj)
 
     n_params = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {n_params:,}\n")
@@ -220,6 +230,7 @@ def main():
         "seq_len": args.seq_len, "pred_len": args.pred_len,
         "d_model": args.d_model, "n_layers": n_layers,
         "n_params": n_params,
+        "k_nn": args.k_nn if args.model == "gnn" else None,
         "test_mse": test_mse, "test_mae": test_mae,
         "history": history,
     }

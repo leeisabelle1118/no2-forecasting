@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-compare.py — Load saved checkpoints and compare Transformer vs Mamba.
+compare.py — Load saved checkpoints and compare Transformer, Mamba, and GNN.
 
 Generates:
   • outputs/comparison_results.json  — MSE / MAE / param counts
@@ -10,9 +10,10 @@ Generates:
 
 Usage
 -----
-# After training both models:
+# After training all models:
 python train.py --model transformer
 python train.py --model mamba
+python train.py --model gnn
 python compare.py
 """
 from __future__ import annotations
@@ -65,7 +66,7 @@ def plot_curves(histories: dict[str, list[dict]], out: Path):
         ax.legend()
         ax.grid(alpha=0.3)
 
-    fig.suptitle("Transformer vs Mamba — Training curves", fontweight="bold")
+    fig.suptitle("Transformer vs Mamba vs GNN — Training curves", fontweight="bold")
     plt.tight_layout()
     fig.savefig(out, dpi=150)
     plt.close(fig)
@@ -79,7 +80,7 @@ def plot_scatter(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: P
     if n_models == 1:
         axes = [axes]
 
-    colors = {"transformer": "steelblue", "mamba": "darkorange"}
+    colors = {"transformer": "steelblue", "mamba": "darkorange", "gnn": "seagreen"}
     flat_y = targets.ravel()
     # Sample for readability
     idx = np.random.choice(len(flat_y), min(5000, len(flat_y)), replace=False)
@@ -105,7 +106,9 @@ def plot_scatter(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: P
 
 
 def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: Path):
-    """Per-site MAE overlaid on a lat/lon scatter map."""
+    """Per-site MAE overlaid on a Cartopy geographic map."""
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
     from data.load_airnow import site_meta, DATA_DIR, load_sequences
 
     _, _, _, sites = load_sequences(seq_len=24, pred_len=6)   # for site codes
@@ -113,41 +116,76 @@ def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: 
     common = [s for s in sites if s in meta.index]
     site_idx = [sites.index(s) for s in common]
 
-    # MAE per site averaged over time and pred steps
+    lats = meta.loc[common, "lat"].values
+    lons = meta.loc[common, "lon"].values
+
+    # Shared colour scale across all models
+    all_maes = []
+    for preds in model_preds.values():
+        site_mae = np.abs(preds - targets).mean(axis=(0, 1))
+        all_maes.append(site_mae[site_idx])
+    vmax = np.nanpercentile(np.concatenate(all_maes), 95)
+
     n_models = len(model_preds)
-    fig, axes = plt.subplots(1, n_models, figsize=(7 * n_models, 5),
-                              subplot_kw={"aspect": "auto"})
+    proj = ccrs.AlbersEqualArea(central_longitude=-96, central_latitude=37.5,
+                                standard_parallels=(29.5, 45.5))
+    fig, axes = plt.subplots(
+        1, n_models,
+        figsize=(8 * n_models, 5.5),
+        subplot_kw={"projection": proj},
+    )
     if n_models == 1:
         axes = [axes]
 
     for ax, (name, preds) in zip(axes, model_preds.items()):
-        # preds: (n_windows, pred_len, n_sites)  targets same shape
         site_mae = np.abs(preds - targets).mean(axis=(0, 1))  # (n_sites,)
         mae_common = site_mae[site_idx]
-        lats = meta.loc[common, "lat"].values
-        lons = meta.loc[common, "lon"].values
 
-        sc = ax.scatter(lons, lats, c=mae_common, cmap="YlOrRd",
-                        s=40, alpha=0.85, edgecolors="k", linewidths=0.3,
-                        vmin=0)
-        plt.colorbar(sc, ax=ax, label="MAE (normalised)")
-        ax.set_xlim(-130, -65); ax.set_ylim(24, 55)
-        ax.set_xlabel("Longitude"); ax.set_ylabel("Latitude")
-        ax.set_title(f"{name.capitalize()} — per-site MAE")
-        ax.set_facecolor("#e8f4f8")
+        # ── Map background ────────────────────────────────────────────────
+        ax.set_extent([-125, -66, 24, 50], crs=ccrs.PlateCarree())
+        ax.add_feature(cfeature.OCEAN.with_scale("50m"),
+                       facecolor="#c8dff0", zorder=0)
+        ax.add_feature(cfeature.LAND.with_scale("50m"),
+                       facecolor="#f5f1eb", zorder=1)
+        ax.add_feature(cfeature.LAKES.with_scale("50m"),
+                       facecolor="#c8dff0", zorder=2)
+        ax.add_feature(cfeature.STATES.with_scale("50m"),
+                       edgecolor="#aaaaaa", linewidth=0.5, zorder=3)
+        ax.add_feature(cfeature.BORDERS.with_scale("50m"),
+                       edgecolor="#666666", linewidth=0.9, zorder=4)
+        ax.add_feature(cfeature.COASTLINE.with_scale("50m"),
+                       edgecolor="#444444", linewidth=0.7, zorder=5)
 
-    fig.suptitle("Per-site test MAE — Transformer vs Mamba", fontweight="bold")
+        # ── Site dots ─────────────────────────────────────────────────────
+        sc = ax.scatter(
+            lons, lats,
+            c=mae_common, cmap="YlOrRd",
+            s=22, alpha=0.9,
+            edgecolors="k", linewidths=0.25,
+            vmin=0, vmax=vmax,
+            transform=ccrs.PlateCarree(),
+            zorder=6,
+        )
+        cbar = plt.colorbar(sc, ax=ax, orientation="vertical",
+                            shrink=0.75, pad=0.02)
+        cbar.set_label("MAE (normalised PPB)", fontsize=8)
+        ax.set_title(f"{name.capitalize()} — per-site MAE", fontsize=10, pad=6)
+
+    fig.suptitle("Per-site test MAE — Transformer vs Mamba vs GNN",
+                 fontweight="bold", fontsize=12)
     plt.tight_layout()
-    fig.savefig(out, dpi=150)
+    fig.savefig(out, dpi=180, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved → {out.name}")
 
 
 def main():
     import torch
-    from data.load_airnow import load_sequences, DATA_DIR
+    import torch.nn as nn
+    from data.load_airnow import load_sequences, DATA_DIR, site_meta
     from models.transformer_no2 import NO2Transformer, evaluate
     from models.mamba_no2 import NO2Mamba
+    from models.gnn_no2 import NO2GNN, build_knn_adj
 
     OUTPUTS.mkdir(exist_ok=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -156,7 +194,7 @@ def main():
     results, histories, model_preds = {}, {}, {}
     models_to_eval: list[tuple[str, nn.Module, Path]] = []
 
-    for model_name in ("transformer", "mamba"):
+    for model_name in ("transformer", "mamba", "gnn"):
         ckpt = _latest_ckpt(model_name)
         if ckpt is None:
             print(f"No checkpoint found for {model_name} — skipping.")
@@ -176,10 +214,18 @@ def main():
             m = NO2Transformer(n_sites=n_sites, seq_len=seq_len,
                                pred_len=pred_len, d_model=d_model,
                                n_layers=n_layers)
-        else:
+        elif model_name == "mamba":
             m = NO2Mamba(n_sites=n_sites, seq_len=seq_len,
                          pred_len=pred_len, d_model=d_model,
                          n_layers=n_layers)
+        else:  # gnn
+            k_nn = meta.get("k_nn", 5) or 5
+            gnn_meta = site_meta(DATA_DIR)
+            adj = build_knn_adj(gnn_meta["lat"].values,
+                                gnn_meta["lon"].values, k=k_nn)
+            m = NO2GNN(n_sites=n_sites, seq_len=seq_len,
+                       pred_len=pred_len, d_model=d_model,
+                       n_layers=n_layers, k_nn=k_nn, adj=adj)
 
         m.load_state_dict(torch.load(ckpt, map_location=device, weights_only=True))
         models_to_eval.append((model_name, m, meta))
@@ -194,7 +240,8 @@ def main():
     if not models_to_eval:
         print("No checkpoints found. Train at least one model first:\n"
               "  python train.py --model transformer\n"
-              "  python train.py --model mamba")
+              "  python train.py --model mamba\n"
+              "  python train.py --model gnn")
         return
 
     # ── Load test data (same config as first checkpoint) ─────────────────────
@@ -210,7 +257,7 @@ def main():
     print(f"Test set: {len(X_test):,} windows\n")
 
     # ── Evaluate & collect predictions ────────────────────────────────────────
-    import torch.nn as nn
+
     for model_name, m, meta in models_to_eval:
         m = m.to(device).eval()
         from models.transformer_no2 import _make_loader

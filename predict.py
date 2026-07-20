@@ -45,7 +45,7 @@ def _latest_ckpt(model_name: str) -> Path | None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="NO₂ forecast from a saved checkpoint")
-    p.add_argument("--model",  choices=["transformer", "mamba"],
+    p.add_argument("--model",  choices=["transformer", "mamba", "gnn"],
                    default="transformer")
     p.add_argument("--data-dir", default="/mnt/data3/AirNow")
     p.add_argument("--start",  default=None,
@@ -66,6 +66,7 @@ def main():
     from data.load_airnow import load_all, load_sequences, site_meta, DATA_DIR
     from models.transformer_no2 import NO2Transformer, _make_loader
     from models.mamba_no2 import NO2Mamba
+    from models.gnn_no2 import NO2GNN, build_knn_adj
 
     args = parse_args()
     data_dir = args.data_dir or DATA_DIR
@@ -131,10 +132,17 @@ def main():
         model = NO2Transformer(n_sites=n_sites, seq_len=seq_len,
                                pred_len=pred_len, d_model=d_model,
                                n_layers=n_layers)
-    else:
+    elif args.model == "mamba":
         model = NO2Mamba(n_sites=n_sites, seq_len=seq_len,
                          pred_len=pred_len, d_model=d_model,
                          n_layers=n_layers)
+    else:  # gnn — adj is restored from the checkpoint buffer
+        k_nn = meta_info.get("k_nn", 5) or 5
+        gnn_meta = site_meta(data_dir)
+        adj = build_knn_adj(gnn_meta["lat"].values, gnn_meta["lon"].values, k=k_nn)
+        model = NO2GNN(n_sites=n_sites, seq_len=seq_len,
+                       pred_len=pred_len, d_model=d_model,
+                       n_layers=n_layers, k_nn=k_nn, adj=adj)
 
     model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=True))
     model = model.to(device).eval()

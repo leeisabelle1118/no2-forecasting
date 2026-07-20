@@ -118,7 +118,8 @@ NO2 Forecasting/
 ├── models/
 │   ├── __init__.py
 │   ├── transformer_no2.py    # Encoder-only Transformer (Vaswani et al. 2017)
-│   └── mamba_no2.py          # Mamba SSM (Gu & Dao 2023), pure-PyTorch
+│   ├── mamba_no2.py          # Mamba SSM (Gu & Dao 2023), pure-PyTorch
+│   └── gnn_no2.py            # k-NN GCN + GRU baseline
 ├── notebooks/
 │   ├── 01_explore_airnow.ipynb   # EDA: site map, time series, diurnal cycle,
 │   │                             #      missing data, model forward-pass check
@@ -130,7 +131,7 @@ NO2 Forecasting/
 ├── outputs/                  # Checkpoints (.pt), training history (.json),
 │                             # comparison plots (.png)  — gitignored
 ├── plots/                    # EDA figures saved by the notebooks — gitignored
-├── train.py                  # CLI training script (Transformer or Mamba)
+├── train.py                  # CLI training script (Transformer, Mamba, or GNN)
 ├── predict.py                # Load a checkpoint and forecast a date range
 ├── compare.py                # Load checkpoints, compare MSE/MAE, save plots
 ├── environment.yml           # Conda environment spec
@@ -171,6 +172,12 @@ python train.py --model transformer
 # Train Mamba with a 48-hour look-back and 12-hour forecast
 python train.py --model mamba --seq-len 48 --pred-len 12
 
+# Train GNN baseline (k-NN spatial graph + GRU temporal, default k=5)
+python train.py --model gnn
+
+# GNN with custom graph connectivity and smaller hidden dim
+python train.py --model gnn --k-nn 8 --d-model 64 --epochs 60
+
 # All options
 python train.py --help
 ```
@@ -188,6 +195,9 @@ python predict.py --model transformer
 python predict.py --model mamba --start 2024-08-01 --end 2024-08-07 \
     --sites "Seattle-Beacon Hill" "Portland SE Lafayette"
 
+# Forecast with the GNN model
+python predict.py --model gnn
+
 # List available site names
 python predict.py --list-sites
 ```
@@ -197,6 +207,12 @@ Saves per-site CSVs and time-series PNGs to `outputs/`.
 ### Compare models
 
 ```bash
+# After training any combination of models:
+python train.py --model transformer
+python train.py --model mamba
+python train.py --model gnn
+
+# Compare all available checkpoints
 python compare.py
 ```
 
@@ -478,17 +494,45 @@ Output (B, pred_len, n_sites)
 The pure-PyTorch SSM scan runs on CPU or GPU without custom CUDA kernels.
 Install `mamba-ssm` to enable the fused CUDA kernel for faster GPU training.
 
+### GNN baseline (`models/gnn_no2.py`)
+
+```
+Input (B, seq_len, n_sites)
+  → [at every time step]:
+      n_layers × GCNLayer(in → d_model)   — spatial: Â h W
+      + residual skip connection
+  → reshape to (B·n_sites, seq_len, d_model)
+  → GRU(d_model → d_model)               — temporal (weight-shared across sites)
+  → Dropout
+  → Linear(d_model, pred_len)            — per-site output head
+  → reshape to (B, pred_len, n_sites)
+Output (B, pred_len, n_sites)
+```
+
+The graph Â is built from station lat/lon coordinates using k-nearest neighbours
+(great-circle distance), symmetrised, self-loops added, then normalised with
+D⁻½ A D⁻½. It is stored as a non-trainable model buffer and saved with the
+checkpoint, so it is never recomputed at inference time.
+
+| Hyperparameter | Default |
+|---|---|
+| `d_model` | 64 |
+| `n_layers` | 2 |
+| `k_nn` | 5 |
+| `dropout` | 0.1 |
+
 ---
 
 ## `train.py` options
 
 | Flag | Default | Description |
 |---|---|---|
-| `--model` | `transformer` | `transformer` or `mamba` |
+| `--model` | `transformer` | `transformer`, `mamba`, or `gnn` |
 | `--seq-len` | 24 | Look-back window (hours) |
 | `--pred-len` | 6 | Forecast horizon (hours) |
 | `--d-model` | 128 | Hidden dimension |
-| `--n-layers` | 2 / 3 | Encoder layers |
+| `--n-layers` | 2 / 3 / 2 | Encoder layers (Transformer / Mamba / GNN) |
+| `--k-nn` | 5 | k-nearest neighbours for GNN graph (ignored for other models) |
 | `--epochs` | 50 | Max training epochs |
 | `--batch-size` | 64 | Batch size |
 | `--lr` | 1e-3 | Initial learning rate |
@@ -503,6 +547,8 @@ Install `mamba-ssm` to enable the fused CUDA kernel for faster GPU training.
   https://arxiv.org/abs/1706.03762
 - Gu & Dao (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*.
   https://arxiv.org/abs/2312.00752
+- Kipf & Welling (2017). *Semi-Supervised Classification with Graph Convolutional Networks*.
+  ICLR. https://arxiv.org/abs/1609.02907
 - AirNow API — https://www.airnowapi.org/
 
 ---
