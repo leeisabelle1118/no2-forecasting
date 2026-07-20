@@ -163,10 +163,28 @@ pip install mamba-ssm causal-conv1d
 
 ## Quick start
 
+### Experiment design — train / val / test split
+
+The dataset covers **2023-07-01 → 2024-09-30** (15 complete months, 10 992 h).  
+All three models (Transformer, Mamba, GNN) use the **same chronological, leak-free split**:
+
+| Partition | Date range | Months | Hours |
+|---|---|---|---|
+| **Train** | 2023-07-01 → 2024-04-30 | 10 | ~7 320 |
+| **Validation** | 2024-05-01 → 2024-06-30 | 2 | ~1 464 |
+| **Test** | 2024-07-01 → 2024-09-30 | 3 | ~2 208 |
+
+*Train + Val = 12 months. Test = final 3 months (never touched during training or tuning).*
+
+Windows are assigned by **start timestamp** (not row fraction), so the split is reproducible and identical regardless of `--seq-len` or `--stride`.  
+Per-site normalisation is computed **exclusively on training-period data** (`norm_end="2024-04-30 23:00"`) to prevent look-ahead leakage.
+
+---
+
 ### Training (CLI)
 
 ```bash
-# Train Transformer for 50 epochs (default)
+# Train Transformer for 50 epochs (default split: train→2024-04-30, val→2024-06-30)
 python train.py --model transformer
 
 # Train Mamba with a 48-hour look-back and 12-hour forecast
@@ -178,17 +196,20 @@ python train.py --model gnn
 # GNN with custom graph connectivity and smaller hidden dim
 python train.py --model gnn --k-nn 8 --d-model 64 --epochs 60
 
+# Override split boundaries (YYYY-MM-DD)
+python train.py --model transformer --train-end 2024-03-31 --val-end 2024-05-31
+
 # All options
 python train.py --help
 ```
 
 Checkpoints are saved to `outputs/<model>_s<seq>_p<pred>_d<dim>.pt`.
-Training history (loss curves, test MSE/MAE) is saved as a JSON alongside.
+Training history (loss curves, test MSE/MAE, split metadata) is saved as a JSON alongside.
 
 ### Inference / prediction
 
 ```bash
-# Forecast the last week of the test set using the best Transformer checkpoint
+# Forecast the test set (2024-07-01 → 2024-09-30) using the best Transformer checkpoint
 python predict.py --model transformer
 
 # Forecast a specific date range and plot named sites

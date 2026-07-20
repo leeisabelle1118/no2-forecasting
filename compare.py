@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).parent
@@ -109,9 +110,9 @@ def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: 
     """Per-site MAE overlaid on a Cartopy geographic map."""
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
-    from data.load_airnow import site_meta, DATA_DIR, load_sequences
+    from data.load_airnow import site_meta, DATA_DIR, load_sequences, TRAIN_END
 
-    _, _, _, sites = load_sequences(seq_len=24, pred_len=6)   # for site codes
+    _, _, _, sites = load_sequences(seq_len=24, pred_len=6, norm_end=str(TRAIN_END))   # for site codes
     meta = site_meta(DATA_DIR)
     common = [s for s in sites if s in meta.index]
     site_idx = [sites.index(s) for s in common]
@@ -182,7 +183,7 @@ def plot_site_mae(model_preds: dict[str, np.ndarray], targets: np.ndarray, out: 
 def main():
     import torch
     import torch.nn as nn
-    from data.load_airnow import load_sequences, DATA_DIR, site_meta
+    from data.load_airnow import load_sequences, DATA_DIR, site_meta, TRAIN_END, VAL_END
     from models.transformer_no2 import NO2Transformer, evaluate
     from models.mamba_no2 import NO2Mamba
     from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -244,17 +245,18 @@ def main():
               "  python train.py --model gnn")
         return
 
-    # ── Load test data (same config as first checkpoint) ─────────────────────
+    # ── Load test data (same seq/pred config as first checkpoint) ─────────────
     ref_meta = models_to_eval[0][2]
     print("Loading test data …")
     X, y, timestamps, sites = load_sequences(
-        seq_len=ref_meta["seq_len"], pred_len=ref_meta["pred_len"])
-    n = len(X)
-    n_train = int(n * 0.70)
-    n_val   = int(n * 0.15)
-    X_test  = X[n_train + n_val:]
-    y_test  = y[n_train + n_val:]
-    print(f"Test set: {len(X_test):,} windows\n")
+        seq_len=ref_meta["seq_len"], pred_len=ref_meta["pred_len"],
+        norm_end=str(TRAIN_END))
+    ts       = pd.to_datetime(timestamps)
+    idx_test = ts > VAL_END
+    X_test   = X[idx_test]
+    y_test   = y[idx_test]
+    print(f"Test set: {idx_test.sum():,} windows  "
+          f"({ts[idx_test][0]} → {ts[idx_test][-1]})\n")
 
     # ── Evaluate & collect predictions ────────────────────────────────────────
 

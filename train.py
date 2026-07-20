@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 
@@ -30,7 +31,7 @@ import torch.nn as nn
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-from data.load_airnow import load_sequences, DATA_DIR
+from data.load_airnow import load_sequences, DATA_DIR, TRAIN_END, VAL_END
 from models.transformer_no2 import NO2Transformer, _make_loader, evaluate
 from models.mamba_no2 import NO2Mamba
 from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -60,8 +61,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr",         type=float, default=1e-3)
     p.add_argument("--patience",   type=int, default=8,
                    help="Early-stopping patience (epochs without val improvement)")
-    p.add_argument("--train-frac", type=float, default=0.70)
-    p.add_argument("--val-frac",   type=float, default=0.15)
+    p.add_argument("--train-end", default=str(TRAIN_END.date()),
+                   help="Last date of training set YYYY-MM-DD "
+                        "(default: %(default)s = end of month 10 of 15)")
+    p.add_argument("--val-end",   default=str(VAL_END.date()),
+                   help="Last date of validation set YYYY-MM-DD "
+                        "(default: %(default)s → test = Jul–Sep 2024)")
     p.add_argument("--fill-nan",   type=float, default=0.0)
     p.add_argument("--no-norm",    action="store_true",
                    help="Disable per-site normalisation")
@@ -163,20 +168,33 @@ def main():
         stride=args.stride,
         fill_nan=args.fill_nan,
         normalize=not args.no_norm,
+        norm_end=args.train_end + " 23:00",
     )
     n_sites = X.shape[2]
-    n       = len(X)
-    n_train = int(n * args.train_frac)
-    n_val   = int(n * args.val_frac)
 
-    X_train, y_train = X[:n_train],              y[:n_train]
-    X_val,   y_val   = X[n_train:n_train+n_val], y[n_train:n_train+n_val]
-    X_test,  y_test  = X[n_train+n_val:],        y[n_train+n_val:]
+    ts            = pd.to_datetime(timestamps)
+    train_end_ts  = pd.Timestamp(args.train_end + " 23:00")
+    val_end_ts    = pd.Timestamp(args.val_end   + " 23:00")
 
-    print(f"  Train : {n_train:,} windows  "
-          f"({timestamps[0]} → {timestamps[n_train-1]})")
-    print(f"  Val   : {n_val:,} windows")
-    print(f"  Test  : {len(X_test):,} windows\n")
+    idx_train = ts <= train_end_ts
+    idx_val   = (ts > train_end_ts) & (ts <= val_end_ts)
+    idx_test  = ts > val_end_ts
+
+    X_train, y_train = X[idx_train], y[idx_train]
+    X_val,   y_val   = X[idx_val],   y[idx_val]
+    X_test,  y_test  = X[idx_test],  y[idx_test]
+
+    ts_arr = ts.to_numpy()
+    print(f"  Train : {idx_train.sum():,} windows  "
+          f"({ts_arr[idx_train][0].astype('datetime64[h]')} → "
+          f"{ts_arr[idx_train][-1].astype('datetime64[h]')})")
+    print(f"  Val   : {idx_val.sum():,} windows  "
+          f"({ts_arr[idx_val][0].astype('datetime64[h]')} → "
+          f"{ts_arr[idx_val][-1].astype('datetime64[h]')})")
+    print(f"  Test  : {idx_test.sum():,} windows  "
+          f"({ts_arr[idx_test][0].astype('datetime64[h]')} → "
+          f"{ts_arr[idx_test][-1].astype('datetime64[h]')})")
+    print()
 
     # ── Model ─────────────────────────────────────────────────────────────────
     n_layers_default = {"transformer": 2, "mamba": 3, "gnn": 2}
@@ -231,6 +249,13 @@ def main():
         "d_model": args.d_model, "n_layers": n_layers,
         "n_params": n_params,
         "k_nn": args.k_nn if args.model == "gnn" else None,
+        "split": {
+            "train_end": args.train_end,
+            "val_end":   args.val_end,
+            "n_train":   int(idx_train.sum()),
+            "n_val":     int(idx_val.sum()),
+            "n_test":    int(idx_test.sum()),
+        },
         "test_mse": test_mse, "test_mae": test_mae,
         "history": history,
     }

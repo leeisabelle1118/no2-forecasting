@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     import torch
-    from data.load_airnow import load_all, load_sequences, site_meta, DATA_DIR
+    from data.load_airnow import load_all, load_sequences, site_meta, DATA_DIR, TRAIN_END, VAL_END
     from models.transformer_no2 import NO2Transformer, _make_loader
     from models.mamba_no2 import NO2Mamba
     from models.gnn_no2 import NO2GNN, build_knn_adj
@@ -102,28 +102,29 @@ def main():
     # ── Load full dataset (raw, for plotting) and normalised sequences ────────
     df_raw = load_all(data_dir)                          # (n_hours, n_sites) PPB
     X, y, timestamps, sites = load_sequences(
-        data_dir, seq_len=seq_len, pred_len=pred_len, normalize=True)
+        data_dir, seq_len=seq_len, pred_len=pred_len,
+        normalize=True, norm_end=str(TRAIN_END))
 
-    n = len(X)
-    n_train = int(n * 0.70); n_val = int(n * 0.15)
+    ts      = pd.to_datetime(timestamps)
+    n       = len(X)
     n_sites = X.shape[2]
 
-    # Default: test set
+    # Default window: test set (starts after VAL_END)
     if args.start:
         start_dt = pd.Timestamp(args.start)
-        idx0 = next((i for i, t in enumerate(timestamps) if t >= start_dt), n_train + n_val)
+        idx0 = int(np.searchsorted(ts, start_dt))
     else:
-        idx0 = n_train + n_val
+        idx0 = int((ts > VAL_END).argmax())
 
     if args.end:
         end_dt = pd.Timestamp(args.end) + pd.Timedelta(hours=23)
-        idx1 = next((i for i, t in enumerate(timestamps) if t > end_dt), n)
+        idx1   = int(np.searchsorted(ts, end_dt, side="right"))
     else:
         idx1 = n
 
     X_pred = X[idx0:idx1]
     y_true = y[idx0:idx1]
-    ts_pred = timestamps[idx0:idx1]
+    ts_pred = ts[idx0:idx1]
     print(f"Predicting {len(X_pred):,} windows  "
           f"({ts_pred[0]}  →  {ts_pred[-1]})\n")
 

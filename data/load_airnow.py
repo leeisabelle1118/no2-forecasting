@@ -30,6 +30,16 @@ import pandas as pd
 
 DATA_DIR = "/mnt/data3/AirNow"
 
+# ── Canonical time-series split boundaries (UTC, inclusive ends) ───────────────
+# Dataset: 2023-07-01 → 2024-09-30  (15 months, 10 992 h)
+# Train   : 2023-07-01 → 2024-04-30  (10 months)
+# Val     : 2024-05-01 → 2024-06-30  ( 2 months)  ╮ = 12-month
+# Test    : 2024-07-01 → 2024-09-30  ( 3 months)  ╯   training window
+#
+# Windows are assigned by *start* timestamp — chronological, leak-free.
+TRAIN_END = pd.Timestamp("2024-04-30 23:00")   # last train-window start-hour
+VAL_END   = pd.Timestamp("2024-06-30 23:00")   # last val-window start-hour
+
 
 def _nc_files(data_dir: str = DATA_DIR):
     """Return sorted list of AirNow NetCDF paths."""
@@ -85,7 +95,8 @@ def load_sequences(data_dir: str = DATA_DIR,
                    pred_len: int = 1,
                    stride: int = 1,
                    fill_nan: float = 0.0,
-                   normalize: bool = True):
+                   normalize: bool = True,
+                   norm_end: str | None = None):
     """Return sliding-window sequences ready for Transformer / Mamba training.
 
     Parameters
@@ -94,8 +105,11 @@ def load_sequences(data_dir: str = DATA_DIR,
     pred_len  : forecast horizon (hours).
     stride    : step between consecutive windows.
     fill_nan  : value to substitute for missing observations.
-    normalize : if True, divide each site by its training-set mean (computed
-                on the first 80% of timesteps) so values are in [0, ~few].
+    normalize : if True, divide each site by its mean so values are O(1).
+    norm_end  : timestamp string (e.g. "2024-04-30 23:00") marking the last
+                hour to include when computing the normalisation mean — use
+                TRAIN_END to keep normalisation strictly inside training data.
+                If None, falls back to the first 80% of timesteps.
 
     Returns
     -------
@@ -108,9 +122,13 @@ def load_sequences(data_dir: str = DATA_DIR,
     arr = df.values.astype("float32")           # (n_hours, n_sites)
 
     if normalize:
-        split = int(len(arr) * 0.8)
-        mean = arr[:split].mean(axis=0, keepdims=True)
-        mean = np.where(mean == 0, 1.0, mean)   # avoid /0
+        if norm_end is not None:
+            norm_mask = df.index <= pd.Timestamp(norm_end)
+        else:
+            norm_mask = np.zeros(len(arr), dtype=bool)
+            norm_mask[: int(len(arr) * 0.8)] = True   # backward-compat fallback
+        mean = arr[norm_mask].mean(axis=0, keepdims=True)
+        mean = np.where(mean == 0, 1.0, mean)           # avoid /0
         arr = arr / mean
 
     total = seq_len + pred_len
