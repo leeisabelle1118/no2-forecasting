@@ -126,8 +126,10 @@ NO2 Forecasting/
 │   ├── 02_no2_time_series.ipynb  # Extended time-series plots: top-N sites,
 │   │                             #      regional trends, seasonal overlays,
 │   │                             #      rolling averages, anomaly detection
-│   └── 03_model_diagnostics.ipynb # Diagnostics: error decomposition,
-│                                  #      attention weights, residual ACF/PACF
+│   ├── 03_model_diagnostics.ipynb # Diagnostics: error decomposition,
+│   │                              #      attention weights, residual ACF/PACF
+│   └── 08_baseline_models.ipynb   # Baselines + met-feature correlations,
+│                                  # incremental regression, 3-panel diagnostics
 ├── outputs/                  # Checkpoints (.pt), training history (.json),
 │                             # comparison plots (.png)  — gitignored
 ├── plots/                    # EDA figures saved by the notebooks — gitignored
@@ -249,7 +251,10 @@ Generates four files in `outputs/`:
 Core EDA plots are produced by [`notebooks/01_explore_airnow.ipynb`](notebooks/01_explore_airnow.ipynb).  
 Extended time-series visualisations (regional trends, seasonal overlays, rolling averages, anomaly detection) are in [`notebooks/02_no2_time_series.ipynb`](notebooks/02_no2_time_series.ipynb).  
 Model diagnostics (error decomposition, attention weights, residual ACF/PACF) are in [`notebooks/03_model_diagnostics.ipynb`](notebooks/03_model_diagnostics.ipynb).  
+Baseline benchmarking and meteorology/regression diagnostics are in [`notebooks/08_baseline_models.ipynb`](notebooks/08_baseline_models.ipynb).  
 All figures are saved to `plots/`.
+
+> **Note for notebook 08:** its meteorology correlation/regression sections expect EPA AQS daily CSVs in `no2 analysis/` (NO2, WIND, TEMP, PRESS, RH_DP for 2023/2024). If those files are missing, the notebook will skip those sections and continue.
 
 > **Full graph guide:** For a plain-language explanation of every chart across all
 > three notebooks — what each graph shows, how to read it, and why it matters for
