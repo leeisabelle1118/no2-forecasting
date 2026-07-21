@@ -1,29 +1,32 @@
 # NO₂ Forecasting — Graphs & Visualizations Guide
 
-This document explains every graph produced across notebooks 01–04, what each one
+This document explains every graph produced across notebooks 01–05, what each one
 shows, and **why it matters for predicting NO₂**. The notebooks form a
 deliberate pipeline: explore the raw data → understand the temporal structure →
-diagnose the trained models → evaluate GraphMamba predictions against ground truth.
+train and validate a baseline Transformer → diagnose the trained models →
+evaluate GraphMamba predictions against ground truth.
 
 ---
 
 ## The Big Picture: How the Notebooks Connect
 
 ```
-Notebook 01  →  Notebook 02  →  Notebook 03  →  Notebook 04
-(Data Quality   (Temporal        (Model           (LA Basin
- & Spatial       Structure)       Diagnostics)     GraphMamba vs
- Exploration)                                      AirNow Obs)
-     ↓               ↓               ↓                  ↓
- Know WHAT        Know WHEN       Know WHERE        Know HOW WELL
- data you have    patterns exist  the model fails   the model predicts
+Notebook 01  →  Notebook 02  →  Notebook 05  →  Notebook 03  →  Notebook 04
+(Data Quality   (Temporal        (Train +         (Model           (LA Basin
+ & Spatial       Structure)       Validate         Diagnostics)     GraphMamba vs
+ Exploration)                    Transformer)                        AirNow Obs)
+   ↓               ↓               ↓                ↓                  ↓
+ Know WHAT        Know WHEN       Know IF         Know WHERE        Know HOW WELL
+ data you have    patterns exist  model learns    the model fails   the model predicts
 ```
 
 A forecasting model trained on data it does not understand will not generalise.
-Notebooks 01 and 02 build that understanding. Notebook 03 checks whether the
-trained model has actually captured what the EDA revealed. Notebook 04 closes the
-loop: it overlays GraphMamba's LA Basin predictions against co-located AirNow
-observations for the Jul–Sep 2024 inference window.
+Notebooks 01 and 02 build that understanding. Notebook 05 trains the
+Transformer with the strict timestamp split (12-month train window ending
+2024-06-30, with 2024-06 as validation and Jul-Sep 2024 as test). Notebook 03
+checks whether the trained models have actually captured what the EDA revealed.
+Notebook 04 closes the loop: it overlays GraphMamba's LA Basin predictions
+against co-located AirNow observations for the Jul-Sep 2024 inference window.
 
 ---
 
@@ -33,7 +36,7 @@ Images in this project are saved to two directories:
 
 | Directory | Contents |
 |---|---|
-| `outputs/` | EDA figures from Notebook 01 (`eda_*.png`) and model comparison figures from `compare.py` (`comparison_*.png`, `site_mae_map.png`) |
+| `outputs/` | EDA figures from Notebook 01 (`eda_*.png`), Transformer training figures from Notebook 05 (`transformer_training_curves.png`, `transformer_scatter.png`), and model comparison figures from `compare.py` (`comparison_*.png`, `site_mae_map.png`) |
 | `plots/` | Extended time-series figures from Notebook 02 (`ts_*.png`, `monthly_boxplot.png`) and model diagnostic figures from Notebook 03 (`diag_*.png`) |
 
 Both directories are tracked in git. Only `.pt` checkpoint files are excluded.
@@ -521,6 +524,55 @@ increasing the look-back window could eliminate it.
 
 ---
 
+## Notebook 05 — `05_train_transformer.ipynb`
+### Transformer Training Outputs
+
+Notebook 05 is the reproducible Transformer training notebook that generates the
+model checkpoint, history metadata, and two key diagnostic graphs.
+
+**Split used in the notebook:**
+- Train windows: timestamps <= 2024-05-31 23:00
+- Validation windows: 2024-06-01 00:00 to 2024-06-30 23:00
+- Test windows: timestamps > 2024-06-30 23:00 (Jul-Sep 2024)
+
+This aligns with the strict timestamp policy used by `train.py`, `predict.py`,
+and `compare.py`.
+
+---
+
+### 1. Transformer Training Curves
+**File:** `outputs/transformer_training_curves.png`
+
+Two side-by-side panels:
+- Left: train MSE and validation MSE by epoch.
+- Right: validation MAE by epoch.
+
+**What it shows:**
+Whether optimization is stable, when validation performance plateaus, and where
+early stopping selects the best checkpoint.
+
+**Why it matters for forecasting:**
+It is the first check against overfitting and confirms that the selected model
+state corresponds to minimum validation error before test evaluation.
+
+---
+
+### 2. Transformer Predicted vs Actual Scatter
+**File:** `outputs/transformer_scatter.png`
+
+Scatter of sampled test-set points (normalised units), with a 1:1 reference
+line.
+
+**What it shows:**
+How tightly predictions cluster around perfect agreement and whether errors grow
+at higher concentration levels.
+
+**Why it matters for forecasting:**
+Provides a compact visual summary of bias and spread before deeper spatial/time
+diagnostics in Notebook 03 and `compare.py`.
+
+---
+
 ## Model Comparison Plots (produced by `compare.py`)
 
 These plots summarise the final model comparison step. After training both models,
@@ -584,6 +636,8 @@ local variability is the main driver of forecast difficulty.
 | Rolling averages | 02 | Hierarchy of time scales; relevance of 24-hour window |
 | Anomaly bar chart | 02 | Event calendar for the hardest forecast cases |
 | Anomaly overlay | 02 | Visual identification of event-driven test difficulty |
+| Transformer training curves | 05 | Convergence, overfitting risk, and early-stopping behaviour |
+| Transformer predicted vs actual | 05 | Compact check of test-set bias and variance |
 | Error decomposition | 03 | Which hours/months the model fails and why |
 | Attention heatmap | 03 | Confirms whether the diurnal signal is learned |
 | Residual ACF/PACF | 03 | Unexplained temporal structure; directions for improvement |
