@@ -14,6 +14,8 @@ outputs/*.pt
 # outputs/*.png  — tracked
 # outputs/*.json — tracked
 # outputs/*.csv  — tracked
+# Large per-timestep inference dump (too large for GitHub) — keep local
+outputs/predictions_transformer_20240701_20240929.csv
 
 # Env / IDE
 .env

@@ -1,13 +1,13 @@
 {
   "transformer": {
-    "test_mse": 1.605690836906433,
-    "test_mae": 0.6939669251441956,
+    "test_mse": 1.3667103052139282,
+    "test_mae": 0.6218940615653992,
     "n_params": 3922590,
     "checkpoint": "transformer_s24_p6_d128.pt"
   },
   "mamba": {
-    "test_mse": 2.0480308532714844,
-    "test_mae": 0.876640260219574,
+    "test_mse": 1.7242136001586914,
+    "test_mae": 0.7872682213783264,
     "n_params": 4020126,
     "checkpoint": "mamba_s24_p6_d128.pt"
   }
