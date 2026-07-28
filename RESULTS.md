@@ -1,8 +1,8 @@
 # NO₂ Forecasting Model Results
 
-**Date:** 2026-07-20  
+**Date:** 2026-07-28  
 **Repository:** NO2 Forecasting  
-**Dataset:** AirNow NO₂ ground stations (182 sites, 2023-07-01 → 2024-09-30)
+**Dataset:** AirNow NO₂ ground stations (197 sites, 2023-07-01 → 2024-09-30)
 
 ---
 
@@ -97,14 +97,24 @@
 
 ### GNN Model
 
-**Status:** ❌ Model error (pre-existing bug, not related to split implementation)
+**Status:** ✅ Completed (latest standalone run)
 
-```
-RuntimeError: einsum(): subscript j has size 197 for operand 1 
-which does not broadcast with previously seen size 182
-```
+**Model Details:**
+- **Parameters:** 34,054
+- **Architecture:** k-NN Graph Convolution + GRU temporal decoder
+- **d_model:** 64, **n_layers:** 2, **k_nn:** 5
 
-**Analysis:** The GNN has an internal dimension mismatch in its graph convolution layer. This is unrelated to the timestamp-based split implementation (Transformer and Mamba trained successfully with the same split).
+**Training:**
+- **Total epochs:** 50
+- **Best validation epoch:** Epoch 47 (val_mse = 0.4792)
+- **Checkpoint:** `gnn_s24_p6_d64.pt`
+
+**Test Performance:**
+- **Test MSE:** 0.7965
+- **Test MAE:** 0.4342
+
+**Implementation note:**
+- The adjacency mismatch was fixed by aligning graph construction to `site_codes` from `load_sequences` and keeping self-loops for sites without metadata.
 
 ---
 
@@ -114,23 +124,22 @@ which does not broadcast with previously seen size 182
 
 | Model | Parameters | Test MSE | Test MAE | Rank |
 |---|---|---|---|---|
-| **Transformer** | 3,922,590 | **1.3667** | **0.6219** | 🥇 1st |
-| **Mamba** | 4,020,126 | 1.7242 | 0.7873 | 🥈 2nd |
-| GNN | — | — | — | ❌ error |
+| **GNN** | **34,054** | **0.7965** | **0.4342** | 🥇 1st |
+| Transformer | 3,922,590 | 1.3667 | 0.6219 | 🥈 2nd |
+| Mamba | 4,020,126 | 1.7242 | 0.7873 | 🥉 3rd |
 
 ### Performance Gap
 
-| Metric | Transformer | Mamba | Gap | Winner |
+| Metric | Best | Second | Gap | Winner |
 |---|---|---|---|---|
-| **MSE** | 1.3667 | 1.7242 | -19.8% | Transformer |
-| **MAE** | 0.6219 | 0.7873 | -21.0% | Transformer |
+| **MSE** | 0.7965 (GNN) | 1.3667 (Transformer) | -41.7% | GNN |
+| **MAE** | 0.4342 (GNN) | 0.6219 (Transformer) | -30.2% | GNN |
 
 **Key Findings:**
-- ✅ **Transformer outperforms Mamba** across all evaluation metrics
-- ✅ **Transformer trains 4-5x faster** (10-14s/epoch vs 43-54s/epoch)
-- ✅ **Transformer has fewer parameters** (3.9M vs 4.0M, lower overfitting risk)
-- ✅ **Transformer generalizes better** on NO₂ forecasting task
-- ✅ **Consistent split boundaries** used across all models (12 months training, 3 months test)
+- ✅ **GNN currently has the best test metrics** in the latest run
+- ✅ **Transformer remains a strong baseline** and clearly outperforms Mamba
+- ✅ **GNN is far smaller** (34k params) than Transformer/Mamba (~4M)
+- ✅ **Consistent split boundaries** used across models (12-month train window, 3-month test)
 
 ---
 
@@ -152,6 +161,16 @@ which does not broadcast with previously seen size 182
    - Per-site MAE overlaid on geographic map (Albers Equal Area projection)
    - Side-by-side comparison: Transformer vs Mamba
    - Red/orange indicates higher error sites
+
+### GNN-Specific Plots (latest run)
+
+4. **`gnn_training_curves.png`**
+   - Training MSE and validation MSE/MAE over 50 epochs
+   - Used to confirm convergence stability and absence of severe overfitting
+
+5. **`gnn_scatter.png`**
+   - Predicted vs actual NO₂ scatter on test windows
+   - Tighter concentration around the diagonal indicates better calibration
 
 ### Cartopy Geographic Maps (from cartopy_maps.py)
 
@@ -197,6 +216,15 @@ which does not broadcast with previously seen size 182
 - **Model error distribution:** Not uniformly random; clustered near urban centers and coastal areas
 - **Regional performance:** Both models perform similarly in rural areas; differences prominent in high-pollution zones
 
+### How to Interpret the Plots
+
+Use this sequence when reading the figures:
+1. Start with test metrics (MSE/MAE) to establish overall ranking.
+2. Use scatter plots to check calibration against the 1:1 line.
+3. Use MAE maps to identify where errors cluster geographically.
+4. Use bias maps to detect systematic under/overprediction by region.
+5. Use training curves to verify convergence behavior and stability.
+
 ---
 
 ## 5. Normalization & Denormalization
@@ -240,7 +268,8 @@ outputs/
 ├── transformer_s24_p6_d128_history.json    # Training curves, split metadata, test metrics
 ├── mamba_s24_p6_d128.pt                    # Trained Mamba weights
 ├── mamba_s24_p6_d128_history.json          # Training curves, split metadata, test metrics
-└── gnn_s24_p6_d128.pt                      # [ERROR — not generated]
+├── gnn_s24_p6_d64.pt                       # Trained GNN weights
+└── gnn_s24_p6_d64_history.json             # Training curves, split metadata, test metrics
 ```
 
 ### Comparison & Evaluation Outputs
@@ -251,6 +280,8 @@ outputs/
 ├── comparison_curves.png                   # Training/validation loss over epochs
 ├── comparison_scatter.png                  # Predicted vs actual scatter
 ├── site_mae_map.png                        # Per-site MAE geographic map
+├── gnn_training_curves.png                 # GNN train/val curves (latest run)
+├── gnn_scatter.png                         # GNN predicted vs actual scatter
 └── (geographic visualizations — see below)
 ```
 
@@ -278,11 +309,14 @@ outputs/
    - Test: 3 months (completely held-out, never touched during training)
    - Windows assigned by chronological start timestamp (reproducible, leak-free)
 
-✅ **Transformer model outperforms baseline SSM (Mamba)**:
-   - 19.8% lower test MSE
-   - 21.0% lower test MAE
-   - 4-5x faster training
-   - Smaller parameter count
+✅ **GNN run completed successfully with improved metrics**:
+   - Test MSE: 0.7965
+   - Test MAE: 0.4342
+   - Adjacency mismatch resolved with site-code aligned graph construction
+
+✅ **Transformer remains superior to Mamba**:
+   - 19.8% lower MSE than Mamba
+   - 21.0% lower MAE than Mamba
 
 ✅ **Comprehensive evaluation pipeline**:
    - Automated checkpointing and early stopping
@@ -296,11 +330,11 @@ outputs/
 
 ### Next Steps
 
-1. **GNN Debugging:** Fix dimension mismatch in graph convolution layer
-2. **Hyperparameter Tuning:** Optimize Mamba architecture (larger d_model, different SSM parameters)
-3. **Ensemble Methods:** Combine Transformer + Mamba predictions
-4. **Uncertainty Quantification:** Add prediction intervals (e.g., Bayesian prediction)
-5. **Notebook Updates:** Sync 05_train_transformer.ipynb, 06_train_mamba.ipynb, 07_train_gnn.ipynb with new split constants
+1. **Add GNN to automated compare pipeline** so `comparison_results.json` includes all three models.
+2. **Hyperparameter Tuning:** tune GNN/Transformer jointly under the same evaluation sweep.
+3. **Ensemble Methods:** combine GNN + Transformer predictions.
+4. **Uncertainty Quantification:** add prediction intervals (e.g., conformal or Bayesian).
+5. **Notebook parity:** keep notebooks 05/06/07 synchronized with script logic.
 
 ### File Locations
 
