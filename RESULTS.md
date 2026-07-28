@@ -128,6 +128,9 @@
 | Transformer | 3,922,590 | 1.3667 | 0.6219 | 🥈 2nd |
 | Mamba | 4,020,126 | 1.7242 | 0.7873 | 🥉 3rd |
 
+**Note:** GNN metrics above come from the latest standalone GNN run (`gnn_s24_p6_d64_history.json`).
+The current `compare.py` summary file (`comparison_results.json`) still contains Transformer and Mamba only.
+
 ### Performance Gap
 
 | Metric | Best | Second | Gap | Winner |
