@@ -20,6 +20,36 @@
 
 ---
 
+## How to Read the Results
+
+Use this quick interpretation flow when reviewing the figures:
+
+1. Start with aggregate metrics.
+  - Compare Test MSE and Test MAE in the table above.
+  - Lower is better, and both metrics favor Transformer by about 21%.
+
+2. Check calibration with scatter and bias maps.
+  - `comparison_scatter.png`: points close to the 1:1 diagonal indicate accurate predictions.
+  - `cartopy_*_bias.png`: white means near-zero bias; blue means underprediction; red means overprediction.
+
+3. Check spatial reliability with MAE maps.
+  - `cartopy_*_mae.png` and `site_mae_map.png` highlight where errors concentrate.
+  - Warm colors indicate harder stations (often dense urban or industrial areas).
+
+4. Validate temporal behavior with forecast time-series plots.
+  - `forecast_*_transformer.png` should track observed peaks/troughs with minimal lag.
+  - Missed or delayed spikes indicate weaker event responsiveness.
+
+5. Confirm training stability with learning curves.
+  - `comparison_curves.png` should show smooth validation convergence and no widening train/val gap.
+  - Stable convergence supports trust in test-set comparisons.
+
+Interpretation summary for this run:
+- Transformer: better error metrics, tighter scatter alignment, lower MAE footprint, weaker directional bias.
+- Mamba: wider error spread and stronger underprediction tendency at many high-concentration sites.
+
+---
+
 ## 📁 Files in This Folder
 
 ### **Cartopy Geographic Maps (8 files)**
