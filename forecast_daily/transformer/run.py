@@ -1,0 +1,5 @@
+from train_transformer_daily import main
+
+
+if __name__ == "__main__":
+    main()
