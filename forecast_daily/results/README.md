@@ -1,82 +1,118 @@
 # Forecast Daily Results Guide
 
-This folder stores model outputs for daily univariate NO2 forecasting.
+This folder stores outputs from daily univariate NO2 forecasting experiments
+for three models:
+- Transformer
+- Mamba-like (GRU stand-in)
+- GNN-style temporal model
 
-## Files in this folder
+## Training/Testing Methodology
 
-- `airnow_no2_daily_mean.csv`: Daily NO2 series used for training/testing (derived from hourly AirNow site means).
-- `predictions_transformer.csv`, `predictions_mamba.csv`, `predictions_gnn.csv`: Test-period predictions and actual values.
-- `metrics.csv`, `metrics.json`: Summary error metrics for each model.
-- `history_transformer.json`, `history_mamba.json`, `history_gnn.json`: Per-epoch learning curves.
-- `checkpoints/*.pt`: Saved model weights.
-- `plots/*.png`: Visual diagnostics and model comparison graphs.
+All results in this folder were produced by running:
 
-## How to interpret each graph
+```bash
+python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-ratio 0.8
+```
 
-### 1) `plots/timeseries_all_models.png`
+Methodology pipeline:
+1. Load hourly AirNow NO2 data from NetCDF files.
+2. Aggregate to one daily series by taking the mean across sites and then daily averaging.
+3. Build a univariate dataset with:
+   - lookback window K = 7 days
+   - forecast horizon H = 1 day
+4. Split chronologically (no shuffle):
+   - first 80% of days for training
+   - last 20% of days for testing
+5. Fit min-max scaling on training data only, then apply to train and test.
+6. Train each model on the same split and evaluate on the same test period.
+7. Save predictions, metrics, checkpoints, and plots.
 
-What it shows:
-- Black line = observed NO2 values on the test period.
-- Colored lines = each model forecast at the same dates.
+## Model results (this run)
 
-How to read it:
-- Better models track the shape and turning points of the black line.
-- Look for lag: if a model consistently peaks after the observed peak, it is reacting late.
-- Look for amplitude bias: if peaks are always too small or too large, the model is under/over-sensitive.
+From metrics.csv:
 
-What good performance looks like:
-- Predicted curves overlap the observed curve for both high and low NO2 periods.
-- Fewer large misses during spikes.
+| Model | Epochs | Test MAE (ppb) | Test RMSE (ppb) |
+|---|---:|---:|---:|
+| GNN | 50 | 0.745 | 0.930 |
+| Mamba | 50 | 0.720 | 0.934 |
+| Transformer | 50 | 0.919 | 1.118 |
 
-### 2) `plots/scatter_all_models.png`
+Quick takeaways:
+- GNN has the best RMSE (slightly fewer large misses).
+- Mamba has the best MAE (best typical absolute error).
+- Transformer is weaker than the other two in this specific run.
 
-What it shows:
-- Each panel is one model.
-- X-axis = actual NO2, Y-axis = predicted NO2.
-- Red dashed diagonal = perfect predictions (`y = x`).
+## Graphs and how to interpret them
 
-How to read it:
-- Points close to the diagonal mean accurate predictions.
-- Vertical spread around the line means noise/error.
-- Pattern below line at high actual values means underprediction of peaks.
-- Pattern above line at low actual values means overprediction of lows.
+### 1) Time-series comparison
 
-What good performance looks like:
-- Tight point cloud around the dashed line across the full value range.
-- Minimal systematic tilt/bias.
+![Time Series Comparison](plots/timeseries_all_models.png)
 
-### 3) `plots/metrics_bar.png`
+What this plot is:
+- Black line: actual NO2 on the test period.
+- Colored lines: each model prediction over the same dates.
 
-What it shows:
-- MAE and RMSE bars for each model.
+How to interpret:
+- Better models follow the black line shape, peaks, and dips.
+- If peaks are shifted right, the model has lag.
+- If peaks are too low/high, the model under/overestimates amplitude.
 
-Metric meaning:
-- MAE: average absolute error in ppb (lower is better).
-- RMSE: penalizes larger errors more strongly (lower is better).
+What to look for in this run:
+- Mamba and GNN generally track observed changes more closely than Transformer.
 
-How to read it:
-- Use MAE for typical day-to-day error.
-- Use RMSE to judge robustness against large misses/spikes.
-- If RMSE is much higher than MAE, the model likely has occasional big errors.
+### 2) Scatter (actual vs predicted)
 
-## Interpreting model performance overall
+![Scatter Comparison](plots/scatter_all_models.png)
 
-Use all three views together:
-1. Start with `metrics_bar.png` to identify best aggregate error.
-2. Confirm behavior in `timeseries_all_models.png` to check temporal tracking and lag.
-3. Use `scatter_all_models.png` to identify bias (under/overprediction) and outliers.
+What this plot is:
+- One panel per model.
+- X-axis: actual NO2.
+- Y-axis: predicted NO2.
+- Red dashed line: perfect prediction (y = x).
 
-A model can have similar MAE but very different behavior on spikes. Prefer the model that keeps both low aggregate error and better spike tracking for your use case.
+How to interpret:
+- Points near the red line indicate accurate predictions.
+- Wide spread means higher error variance.
+- Systematic points below the line at high actual values indicate peak underprediction.
 
-## Re-running and generating new result sets
+What to look for in this run:
+- GNN and Mamba point clouds are tighter than Transformer overall.
 
-Baseline run (writes to `forecast_daily/results`):
+### 3) Metrics bar chart
+
+![Metrics Bar Chart](plots/metrics_bar.png)
+
+What this plot is:
+- Side-by-side MAE and RMSE bars for each model.
+
+How to interpret:
+- Lower MAE = better average day-to-day accuracy.
+- Lower RMSE = fewer or smaller large errors.
+- If RMSE is much larger than MAE, large outliers are likely present.
+
+What to look for in this run:
+- Mamba leads on MAE.
+- GNN leads on RMSE.
+- Transformer trails both error metrics.
+
+## Key output files
+
+- airnow_no2_daily_mean.csv: Daily series used for training/testing.
+- predictions_transformer.csv, predictions_mamba.csv, predictions_gnn.csv: test predictions with dates and actuals.
+- metrics.csv and metrics.json: summary metrics and ranking.
+- history_*.json: per-epoch train/test curves.
+- checkpoints/*.pt: trained model weights.
+- plots/*.png: visual diagnostics.
+
+## Re-running experiments
+
+Default results folder:
 
 ```bash
 python forecast_daily/generate_results.py --epochs 50
 ```
 
-Longer run to a separate folder (recommended to avoid overwriting):
+Longer run in a separate folder (recommended):
 
 ```bash
 python forecast_daily/generate_results.py --epochs 200 --results-dir results_longrun
