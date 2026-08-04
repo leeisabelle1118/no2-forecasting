@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 # Allow imports from project root and local model folders.
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,7 +92,6 @@ def train_one_model(
     epochs: int,
     lr: float,
     device: str,
-    delta_loss_weight: float,
 ) -> tuple[nn.Module, dict, pd.DataFrame]:
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -104,34 +102,20 @@ def train_one_model(
 
     model = model.to(device)
 
-    def temporal_delta_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        # Penalize day-to-day slope mismatch to reduce 1-day-late reactions.
-        if pred.shape[0] < 2:
-            return torch.zeros((), device=pred.device)
-        pred_delta = pred[1:] - pred[:-1]
-        target_delta = target[1:] - target[:-1]
-        return F.l1_loss(pred_delta, target_delta)
-
     for epoch in range(1, epochs + 1):
         model.train()
         running = 0.0
-        running_delta = 0.0
         n = 0
         for xb, yb in train_loader:
             xb, yb = xb.to(device), yb.to(device)
             opt.zero_grad()
-            pred = model(xb)
-            point_loss = loss_fn(pred, yb)
-            delta_loss = temporal_delta_loss(pred, yb)
-            loss = point_loss + delta_loss_weight * delta_loss
+            loss = loss_fn(model(xb), yb)
             loss.backward()
             opt.step()
-            running += float(point_loss.item()) * len(xb)
-            running_delta += float(delta_loss.item()) * len(xb)
+            running += float(loss.item()) * len(xb)
             n += len(xb)
 
         train_mse = running / max(1, n)
-        train_delta_l1 = running_delta / max(1, n)
         test_mse, test_mae = evaluate_scaled(model, test_loader, device)
         history_train_mse.append(train_mse)
         history_test_mse.append(test_mse)
@@ -140,8 +124,7 @@ def train_one_model(
         if epoch == 1 or epoch % 10 == 0 or epoch == epochs:
             print(
                 f"[{name}] epoch {epoch:3d}/{epochs} "
-                f"train_mse={train_mse:.4f} train_delta_l1={train_delta_l1:.4f} "
-                f"test_mse={test_mse:.4f} test_mae={test_mae:.4f}"
+                f"train_mse={train_mse:.4f} test_mse={test_mse:.4f} test_mae={test_mae:.4f}"
             )
 
     pred_scaled, true_scaled = predict_scaled(model, test_loader, device)
@@ -177,7 +160,6 @@ def save_plots(
     merged_preds: dict[str, pd.DataFrame],
     metrics_df: pd.DataFrame,
     actual_daily_df: pd.DataFrame,
-    plot_shift_days: int = -1,
 ) -> None:
     plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -219,14 +201,12 @@ def save_plots(
             )
         aligned_preds[name] = aligned
 
-    # 1) Full daily timeline with forecast overlays.
-    # `plot_shift_days` is visual-only; metrics remain computed on true target dates.
+    # 1) Full daily timeline with aligned forecast overlays.
     plt.figure(figsize=(13, 5))
     plt.plot(actual_daily["date"], actual_daily["airnow_no2"], label="Actual", linewidth=2.0, color="black", alpha=0.85)
     for name, aligned in aligned_preds.items():
-        plot_dates = aligned["date"] + pd.to_timedelta(plot_shift_days, unit="D")
-        plt.plot(plot_dates, aligned["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
-    plt.title("Forecast Daily: Full Timeline (Actual Daily vs Forecast Overlays)")
+        plt.plot(aligned["date"], aligned["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
+    plt.title("Forecast Daily: Full Timeline (Actual Daily vs Date-Aligned Forecasts)")
     plt.xlabel("Date")
     plt.ylabel("NO2 (ppb)")
     plt.grid(alpha=0.25)
@@ -235,7 +215,7 @@ def save_plots(
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
 
-    # 1b) Daily line + prediction markers with optional visual shift.
+    # 1b) Daily line + prediction markers on exact valid target dates (NaN elsewhere).
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(
         actual_daily["date"],
@@ -247,9 +227,8 @@ def save_plots(
     )
 
     for name, aligned in aligned_preds.items():
-        plot_dates = aligned["date"] + pd.to_timedelta(plot_shift_days, unit="D")
         ax.plot(
-            plot_dates,
+            aligned["date"],
             aligned["pred_ppb"],
             label=f"{name.title()} daily forecast",
             linewidth=1.2,
@@ -259,7 +238,7 @@ def save_plots(
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Full Daily Series With Forecast Overlays")
+    ax.set_title("Forecast Daily: Full Daily Series With Target-Aligned Forecasts")
     ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
@@ -269,53 +248,6 @@ def save_plots(
     plt.tight_layout()
     plt.savefig(plots_dir / "daily_timeseries_with_target_aligned_forecasts.png", dpi=160)
     plt.close(fig)
-
-    # 1c) Zoomed 3-month (test target) view with optional visual shift.
-    target_date_values: list[pd.Timestamp] = []
-    for aligned in aligned_preds.values():
-        valid_dates = aligned.loc[aligned["pred_ppb"].notna(), "date"]
-        if not valid_dates.empty:
-            target_date_values.extend(pd.to_datetime(valid_dates).tolist())
-
-    if target_date_values:
-        zoom_start = pd.Timestamp(min(target_date_values))
-        zoom_end = pd.Timestamp(max(target_date_values))
-        zoom_actual = actual_daily[(actual_daily["date"] >= zoom_start) & (actual_daily["date"] <= zoom_end)]
-
-        fig, ax = plt.subplots(figsize=(14, 5))
-        ax.plot(
-            zoom_actual["date"],
-            zoom_actual["airnow_no2"],
-            label="Actual daily mean",
-            color="black",
-            linewidth=2.0,
-            alpha=0.9,
-        )
-
-        for name, aligned in aligned_preds.items():
-            zoom_pred = aligned[(aligned["date"] >= zoom_start) & (aligned["date"] <= zoom_end)]
-            plot_dates = zoom_pred["date"] + pd.to_timedelta(plot_shift_days, unit="D")
-            ax.plot(
-                plot_dates,
-                zoom_pred["pred_ppb"],
-                label=f"{name.title()} daily forecast",
-                linewidth=1.3,
-                marker="o",
-                markersize=3.0,
-                alpha=0.9,
-                color=color_map.get(name),
-            )
-
-        ax.set_title("Forecast Daily: 3-Month Test Window (Forecast Overlays)")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("NO2 (ppb)")
-        ax.grid(alpha=0.25)
-        ax.legend(ncol=2, fontsize=9)
-        ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
-        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
-        plt.tight_layout()
-        plt.savefig(plots_dir / "timeseries_test_3_months.png", dpi=160)
-        plt.close(fig)
 
     # 2) Per-model scatter plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True, sharey=True)
@@ -356,24 +288,12 @@ def main() -> None:
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument(
-        "--delta-loss-weight",
-        type=float,
-        default=0.35,
-        help="Weight for day-to-day slope matching loss to reduce lagged reactions.",
-    )
-    p.add_argument(
         "--train-end",
         type=str,
         default="auto",
         help="Last date included in training. Use 'auto' for first full-year chronological split.",
     )
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument(
-        "--plot-shift-days",
-        type=int,
-        default=-1,
-        help="Shift prediction dates in plots only (e.g., -1 for one-day left shift).",
-    )
     p.add_argument(
         "--results-dir",
         type=str,
@@ -446,7 +366,6 @@ def main() -> None:
             epochs=args.epochs,
             lr=args.lr,
             device=device,
-            delta_loss_weight=args.delta_loss_weight,
         )
 
         ckpt_dir = results_dir / "checkpoints"
@@ -482,7 +401,7 @@ def main() -> None:
     metrics_df.to_csv(metrics_csv, index=False)
     metrics_df.to_json(metrics_json, orient="records", indent=2)
 
-    save_plots(results_dir, merged_preds, metrics_df, daily_df, plot_shift_days=args.plot_shift_days)
+    save_plots(results_dir, merged_preds, metrics_df, daily_df)
 
     print("\nDone. Artifacts saved to:", results_dir)
     print("- Daily CSV")
