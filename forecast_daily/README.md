@@ -32,12 +32,7 @@ python forecast_daily/train_daily.py --model gnn --epochs 50 --train-end auto
 
 ```bash
 python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-end auto
-```
-
-Optional anti-lag variant (encourages faster response to day-to-day changes):
-
-```bash
-python forecast_daily/generate_results.py --epochs 50 --delta-loss-weight 0.35
+python forecast_daily/generate_results.py --models transformer mamba gnn
 ```
 
 Outputs are written under forecast_daily/results by default.
@@ -46,6 +41,7 @@ Outputs are written under forecast_daily/results by default.
 
 - plots/timeseries_all_models.png: full daily actual series with prediction overlays on valid target dates.
 - plots/daily_timeseries_with_target_aligned_forecasts.png: full-year daily actual series with forecast markers only on valid target dates.
+- plots/timeseries_test_3_months.png: zoomed test-window daily timeline.
 - plots/scatter_all_models.png: actual vs predicted scatter.
 - plots/metrics_bar.png: MAE/RMSE comparison.
 

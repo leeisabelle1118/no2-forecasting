@@ -21,13 +21,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data.load_airnow import load_all
 from gnn.train_gnn_daily import DailyGNN
 from mamba.train_mamba_daily import DailyMambaLike
-from transformer.daily_data import (
+from daily_data_contract import (
+    LOOKBACK_DAYS,
     LEAD_DAYS,
     make_dataloaders,
     prepare_series,
     resolve_train_end,
 )
 from transformer.train_transformer_daily import DailyTransformer
+
+
+BASELINE_MODELS = ["transformer", "mamba", "gnn"]
 
 
 def set_seed(seed: int = 42) -> None:
@@ -44,6 +48,56 @@ def build_daily_series() -> pd.DataFrame:
     daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
     daily = pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values})
     return daily.reset_index(drop=True)
+
+
+def load_baseline_daily_series(csv_path: str | None) -> tuple[pd.DataFrame, str]:
+    if csv_path:
+        raw = pd.read_csv(csv_path)
+        source = csv_path
+    else:
+        raw = build_daily_series()
+        source = "AirNow NetCDF archive"
+
+    daily = prepare_series(raw)
+    return daily, source
+
+
+def validate_baseline_contract(train_loader, test_loader, target_dates: pd.Series, train_end: pd.Timestamp) -> None:
+    train_ds = train_loader.dataset
+    test_ds = test_loader.dataset
+
+    for split_name, ds in [("train", train_ds), ("test", test_ds)]:
+        if ds.X.ndim != 3:
+            raise ValueError(f"{split_name} X must be 3D (N,K,1); got ndim={ds.X.ndim}")
+        if ds.X.shape[1] != LOOKBACK_DAYS or ds.X.shape[2] != 1:
+            raise ValueError(
+                f"{split_name} X contract violation: expected (*,{LOOKBACK_DAYS},1), got {tuple(ds.X.shape)}"
+            )
+        if ds.y.ndim != 2 or ds.y.shape[1] != 1:
+            raise ValueError(f"{split_name} y contract violation: expected (N,1), got {tuple(ds.y.shape)}")
+
+    horizon_days = getattr(test_ds, "forecast_horizon_days", None)
+    if horizon_days != LEAD_DAYS:
+        raise ValueError(f"Expected direct one-step (t+1) forecasting; got horizon_days={horizon_days}")
+
+    if target_dates.empty:
+        raise ValueError("No target dates found for test split")
+    if target_dates.duplicated().any():
+        bad = target_dates[target_dates.duplicated()].iloc[0]
+        raise ValueError(f"Duplicate target date in test set: {pd.Timestamp(bad).date()}")
+    if not target_dates.is_monotonic_increasing:
+        raise ValueError("Target dates must be strictly chronological")
+    if (target_dates <= train_end).any():
+        bad = target_dates[target_dates <= train_end].iloc[0]
+        raise ValueError(
+            "Evaluation includes non-future target date. "
+            f"Found target_date={pd.Timestamp(bad).date()} <= train_end={train_end.date()}"
+        )
+    if len(target_dates) != len(test_ds):
+        raise ValueError(
+            "One-step evaluation requires exactly one prediction target per test dataset row. "
+            f"target_dates={len(target_dates)} dataset_rows={len(test_ds)}"
+        )
 
 
 def evaluate_scaled(model: nn.Module, loader, device: str) -> tuple[float, float]:
@@ -128,6 +182,10 @@ def train_one_model(
             )
 
     pred_scaled, true_scaled = predict_scaled(model, test_loader, device)
+    if pred_scaled.shape != true_scaled.shape:
+        raise ValueError(
+            f"Prediction/target shape mismatch for {name}: pred={pred_scaled.shape} true={true_scaled.shape}"
+        )
     pred_ppb = scaler.inverse_transform(pred_scaled)
     true_ppb = scaler.inverse_transform(true_scaled)
 
@@ -296,7 +354,10 @@ def save_plots(
         plt.close(fig)
 
     # 2) Per-model scatter plot
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True, sharey=True)
+    n_models = len(merged_preds)
+    fig, axes = plt.subplots(1, n_models, figsize=(5.2 * n_models, 4.2), sharex=True, sharey=True)
+    if n_models == 1:
+        axes = [axes]
     for ax, (name, dfp) in zip(axes, merged_preds.items()):
         ax.scatter(dfp["actual_ppb"], dfp["pred_ppb"], s=16, alpha=0.65)
         low = min(dfp["actual_ppb"].min(), dfp["pred_ppb"].min())
@@ -330,6 +391,8 @@ def save_plots(
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Train daily models and generate forecast_daily result plots")
+    p.add_argument("--csv", default=None, help="Optional CSV with columns: date, airnow_no2")
+    p.add_argument("--models", nargs="+", choices=BASELINE_MODELS, default=BASELINE_MODELS)
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=1e-3)
@@ -354,8 +417,8 @@ def main() -> None:
     results_dir = root / args.results_dir
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Building canonical daily NO2 series for direct t+1 forecasting...")
-    daily_df = build_daily_series()
+    daily_df, source = load_baseline_daily_series(args.csv)
+    print(f"Loaded baseline daily NO2 series from {source}")
     effective_train_end = resolve_train_end(prepare_series(daily_df), train_end=args.train_end)
     print(f"Using train_end={effective_train_end.date()} (chronological split)")
     daily_csv = results_dir / "airnow_no2_daily_mean.csv"
@@ -367,9 +430,6 @@ def main() -> None:
         batch_size=args.batch_size,
         train_end=args.train_end,
     )
-    horizon_days = getattr(test_loader.dataset, "forecast_horizon_days", None)
-    if horizon_days != 1:
-        raise ValueError(f"Expected direct one-step (t+1) forecasting; got horizon_days={horizon_days}")
 
     input_dim = int(train_loader.dataset.X.shape[-1])
     target_dates = getattr(test_loader.dataset, "target_dates", None)
@@ -377,26 +437,24 @@ def main() -> None:
         raise ValueError("Missing target_dates metadata on test dataset for daily t+1 evaluation")
     target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
 
-    if not target_dates.empty and (target_dates <= effective_train_end).any():
-        bad = target_dates[target_dates <= effective_train_end].iloc[0]
-        raise ValueError(
-            "Evaluation includes non-future target date. "
-            f"Found target_date={pd.Timestamp(bad).date()} <= train_end={effective_train_end.date()}"
-        )
-    if len(target_dates) != len(test_loader.dataset):
-        raise ValueError(
-            "One-step evaluation requires exactly one prediction target per test dataset row. "
-            f"target_dates={len(target_dates)} dataset_rows={len(test_loader.dataset)}"
-        )
+    validate_baseline_contract(train_loader, test_loader, target_dates, effective_train_end)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    model_map: dict[str, nn.Module] = {
+    all_model_map: dict[str, nn.Module] = {
         "transformer": DailyTransformer(input_dim=input_dim),
         "mamba": DailyMambaLike(input_dim=input_dim),
         "gnn": DailyGNN(input_dim=input_dim),
     }
+    selected_models: list[str] = []
+    seen: set[str] = set()
+    for name in args.models:
+        if name not in seen:
+            selected_models.append(name)
+            seen.add(name)
+
+    model_map = {name: all_model_map[name] for name in selected_models}
 
     metrics_records: list[dict] = []
     merged_preds: dict[str, pd.DataFrame] = {}
@@ -440,6 +498,11 @@ def main() -> None:
         merged_preds[name] = pred_df
         print(f"Saved checkpoint: {ckpt_path}")
         print(f"Saved predictions: {pred_path}")
+
+    if set(merged_preds) != set(model_map):
+        raise ValueError(
+            f"Model output mismatch: expected {sorted(model_map)} got {sorted(merged_preds)}"
+        )
 
     metrics_df = pd.DataFrame(metrics_records).sort_values("test_rmse_ppb").reset_index(drop=True)
     metrics_csv = results_dir / "metrics.csv"

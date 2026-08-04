@@ -1,13 +1,15 @@
 # NO₂ Forecasting - Visual Results Summary
 
 **Test Period:** July 1 — September 30, 2024  
-**Models Evaluated:** Transformer (winner) vs Mamba  
+**Models Evaluated:** Transformer vs Mamba (hourly map track) + GNN/Mamba/Transformer (daily baseline track)  
 **Monitoring Stations:** 197 sites across North America  
 **Split:** 12-month training + 1-month validation + 3-month test
 
 ---
 
 ## 📊 Final Metrics Comparison
+
+### Hourly map track (this visual folder)
 
 | Metric | Transformer | Mamba | Winner |
 |--------|-------------|-------|--------|
@@ -17,6 +19,22 @@
 | **Training Efficiency** | ~15 epochs | ~11 epochs | Transformer (faster convergence) |
 
 **Bottom Line:** Transformer outperforms Mamba across all metrics. Deploy Transformer for operational forecasting.
+
+### Daily baseline addendum (canonical forecast_daily pipeline, includes GNN)
+
+Source: forecast_daily/results/metrics.csv (K=7 daily lag, direct t+1, chronological split)
+
+| Model | Test MAE (ppb) | Test RMSE (ppb) | Rank Note |
+|--------|----------------|-----------------|-----------|
+| **Mamba** | **0.720** | 0.934 | 🥇 Best MAE |
+| **GNN** | 0.745 | **0.930** | 🥇 Best RMSE |
+| Transformer | 0.919 | 1.118 | 3rd in this daily baseline run |
+
+Daily baseline interpretation:
+- GNN is now part of the benchmark and is competitive.
+- Mamba gives the lowest typical absolute error (MAE).
+- GNN gives the lowest large-error sensitivity metric (RMSE).
+- Transformer remains strong in the hourly visual track shown below, but is weaker in the current daily aggregate baseline run.
 
 ---
 
@@ -47,6 +65,41 @@ Use this quick interpretation flow when reviewing the figures:
 Interpretation summary for this run:
 - Transformer: better error metrics, tighter scatter alignment, lower MAE footprint, weaker directional bias.
 - Mamba: wider error spread and stronger underprediction tendency at many high-concentration sites.
+
+Daily baseline addendum:
+- GNN now belongs in the comparison set and should be included in model-selection discussion.
+- If prioritizing peak-day stability, prefer GNN (best RMSE).
+- If prioritizing typical day-to-day absolute error, prefer Mamba (best MAE).
+
+---
+
+## California-Focused Review
+
+To better match operational priorities, give primary attention to California stations in interpretation and sign-off:
+
+- 060710027 (SR-60 Near Road, Pomona/Ontario)
+- 060374008 (I-710 Near Road, Lynwood)
+- 060590008 (Anaheim Near Road)
+- 060710026 (Ontario Near Road)
+- 060376012 (LA-area station already visualized here)
+
+California-first visual checks:
+
+1. Compare observed vs predicted hotspot intensity around the LA Basin in:
+  - cartopy_observed_no2.png
+  - cartopy_transformer_pred_no2.png
+  - cartopy_mamba_pred_no2.png
+2. Inspect California bias specifically (under/over-prediction tendency):
+  - cartopy_transformer_bias.png
+  - cartopy_mamba_bias.png
+3. Use California site time-series examples as first-pass qualitative validation:
+  - forecast_124000100112_transformer.png
+  - forecast_124000100126_transformer.png
+  - forecast_060376012_transformer.png
+
+California-focused recommendation:
+- Treat LA basin and near-road stations as the gating subset for release decisions.
+- When model rankings are close globally, prefer the model with lower bias magnitude across California hotspots.
 
 ---
 
@@ -264,23 +317,24 @@ Each file shows predicted vs actual NO₂ over the full 3-month test period for 
 
 ### **Visual Performance Summary**
 
-| Aspect | Transformer | Mamba |
-|--------|-------------|-------|
-| **NO₂ Predictions** | Accurate, well-matched to observed | Conservative, underpredicts |
-| **Errors** | Mostly yellow (low), sparse orange | Mix of yellow/orange/red |
-| **Bias** | White-dominated (unbiased) | Blue-dominated (underpredicts) |
-| **Time Series** | Tracks observed closely, captures events | Lags behind peaks, misses spikes |
-| **Geographic Hotspots** | Handles LA, Houston, Northeast well | Underestimates all high-pollution zones |
+| Aspect | Transformer | Mamba | GNN |
+|--------|-------------|-------|-----|
+| **Hourly visual-track maps** | Best overall in this folder | Underpredicts in many hotspots | Not available in this map set |
+| **Daily baseline MAE** | 0.919 | **0.720 (best)** | 0.745 |
+| **Daily baseline RMSE** | 1.118 | 0.934 | **0.930 (best)** |
+| **California emphasis** | Strong spatial tracking in existing CA plots | Competitive daily MAE in baseline run | Competitive daily RMSE in baseline run |
 
 ### **Recommendation**
 
-**✅ Deploy Transformer for operational forecasting**
+Use a two-track recommendation:
 
-1. **21% better accuracy** across all metrics (MSE & MAE)
-2. **Unbiased predictions** (white bias map = no systematic error)
-3. **Accurate event detection** (captures pollution spikes in time series)
-4. **Handles complex regions** (urban areas, high-pollution zones)
-5. **Production-ready** (fast training, stable convergence)
+- For the hourly site-level visual workflow documented in this folder: Transformer remains strongest.
+- For the canonical daily baseline benchmark: include GNN and Mamba as top candidates (GNN best RMSE, Mamba best MAE).
+
+California deployment priority:
+1. Rank models first on California near-road stations, then on global aggregate.
+2. Require low California bias magnitude before promotion.
+3. Keep GNN in the candidate set for daily operations due to strong RMSE.
 
 **⚠️ Mamba limitations:**
 - Systematic underprediction across all regions

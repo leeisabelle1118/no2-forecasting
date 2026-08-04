@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -71,70 +72,34 @@ def main() -> None:
         default="auto",
         help="Last date included in training. Use 'auto' for first full-year chronological split.",
     )
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--results-dir", type=str, default="results")
     args = p.parse_args()
 
+    # Legacy per-model entrypoint delegates to canonical baseline runner.
+    target = Path(__file__).resolve().parents[1] / "train_daily.py"
+    cmd = [
+        sys.executable,
+        str(target),
+        "--model",
+        "gnn",
+        "--epochs",
+        str(args.epochs),
+        "--batch-size",
+        str(args.batch_size),
+        "--lr",
+        str(args.lr),
+        "--seed",
+        str(args.seed),
+        "--results-dir",
+        str(args.results_dir),
+        "--train-end",
+        str(args.train_end),
+    ]
     if args.csv:
-        df = pd.read_csv(args.csv)
-        source = args.csv
-    else:
-        df = build_daily_series()
-        source = "AirNow NetCDF archive"
-
-    dates = pd.to_datetime(df["date"])
-    print(f"Loaded daily NO2 from {source}: rows={len(df)}, range={dates.min().date()} to {dates.max().date()}")
-
-    train_loader, test_loader, _ = make_dataloaders(
-        df,
-        batch_size=args.batch_size,
-        train_end=args.train_end,
-    )
-    horizon_days = getattr(test_loader.dataset, "forecast_horizon_days", None)
-    if horizon_days != 1:
-        raise ValueError(f"Expected direct one-step (t+1) forecasting; got horizon_days={horizon_days}")
-
-    split_train_end = getattr(train_loader.dataset, "split_train_end", None)
-    test_target_dates = getattr(test_loader.dataset, "target_dates", None)
-    if split_train_end is not None and test_target_dates is not None:
-        test_target_dates = pd.Series(pd.to_datetime(test_target_dates))
-        if not test_target_dates.empty and (test_target_dates <= pd.Timestamp(split_train_end)).any():
-            bad = test_target_dates[test_target_dates <= pd.Timestamp(split_train_end)].iloc[0]
-            raise ValueError(
-                "Evaluation includes non-future target date. "
-                f"Found target_date={pd.Timestamp(bad).date()} <= train_end={pd.Timestamp(split_train_end).date()}"
-            )
-    input_dim = int(train_loader.dataset.X.shape[-1])
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = DailyGNN(input_dim=input_dim).to(device)
-    opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = nn.MSELoss()
-
-    for epoch in range(1, args.epochs + 1):
-        model.train()
-        running = 0.0
-        n = 0
-        for xb, yb in train_loader:
-            xb, yb = xb.to(device), yb.to(device)
-            opt.zero_grad()
-            loss = loss_fn(model(xb), yb)
-            loss.backward()
-            opt.step()
-            running += float(loss.item()) * len(xb)
-            n += len(xb)
-
-        train_mse = running / max(1, n)
-        test_mse, test_mae = evaluate(model, test_loader, device)
-        if epoch == 1 or epoch % 10 == 0 or epoch == args.epochs:
-            print(
-                f"[GNN] epoch {epoch:3d}/{args.epochs} "
-                f"train_mse={train_mse:.4f} test_mse={test_mse:.4f} test_mae={test_mae:.4f}"
-            )
-
-    out_dir = Path(__file__).resolve().parents[2] / "outputs" / "forecast_daily"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    ckpt = out_dir / "gnn_daily.pt"
-    torch.save(model.state_dict(), ckpt)
-    print(f"Saved: {ckpt}")
+        cmd.extend(["--csv", args.csv])
+    print("Delegating to baseline runner:", " ".join(cmd))
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

@@ -106,6 +106,12 @@ which does not broadcast with previously seen size 182
 
 **Analysis:** The GNN has an internal dimension mismatch in its graph convolution layer. This is unrelated to the timestamp-based split implementation (Transformer and Mamba trained successfully with the same split).
 
+Daily baseline addendum (forecast_daily canonical run):
+- GNN is now available and competitive in the daily baseline benchmark.
+- Test MAE: 0.7449 ppb
+- Test RMSE: 0.9304 ppb (best RMSE among daily baseline models)
+- Source file: forecast_daily/results/metrics.csv
+
 ---
 
 ## 3. Model Comparison
@@ -196,6 +202,7 @@ which does not broadcast with previously seen size 182
 - **Mamba systematic bias:** Tends to underpredict in western regions, compensating elsewhere
 - **Model error distribution:** Not uniformly random; clustered near urban centers and coastal areas
 - **Regional performance:** Both models perform similarly in rural areas; differences prominent in high-pollution zones
+- **California priority:** LA basin and near-road California stations should be the primary subset for release-gating comparisons.
 
 ---
 
