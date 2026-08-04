@@ -14,6 +14,12 @@ All results in this folder were produced by running:
 python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-end auto
 ```
 
+Optional anti-lag setting:
+
+```bash
+python forecast_daily/generate_results.py --epochs 50 --delta-loss-weight 0.35
+```
+
 Methodology pipeline:
 1. Build one canonical daily NO2 mean series (site-mean values per day).
 2. Keep one scalar NO2 value per day as the only model input channel.
@@ -28,20 +34,23 @@ Methodology pipeline:
 6. Train all models on identical train/test windows and evaluate on the same target dates.
 7. Save predictions, metrics, checkpoints, and plots.
 
+Anti-lag note:
+- Training uses a small day-to-day slope matching term (`--delta-loss-weight`) so predictions react faster to rises/drops instead of trailing by one day.
+
 ## Model results (this run)
 
 From metrics.csv:
 
 | Model | Epochs | Test MAE (ppb) | Test RMSE (ppb) |
 |---|---:|---:|---:|
-| GNN | 50 | 0.745 | 0.930 |
-| Mamba | 50 | 0.720 | 0.934 |
-| Transformer | 50 | 0.919 | 1.118 |
+| Transformer | 50 | 0.800 | 1.018 |
+| GNN | 50 | 0.863 | 1.061 |
+| Mamba | 50 | 0.883 | 1.077 |
 
 Quick takeaways:
-- GNN has the best RMSE (slightly fewer large misses).
-- Mamba has the best MAE (best typical absolute error).
-- Transformer is weaker than the other two in this specific run.
+- Transformer has the best MAE and RMSE in this anti-lag run.
+- GNN is close behind Transformer on RMSE.
+- Mamba is competitive but trails the other two here.
 
 ## Graphs and how to interpret them
 
@@ -118,9 +127,9 @@ How to interpret:
 - If RMSE is much larger than MAE, large outliers are likely present.
 
 What to look for in this run:
-- Mamba leads on MAE.
-- GNN leads on RMSE.
-- Transformer trails both error metrics.
+- Transformer leads on both MAE and RMSE.
+- GNN is second-best on RMSE.
+- Mamba is third on both error metrics in this run.
 
 ## Key output files
 

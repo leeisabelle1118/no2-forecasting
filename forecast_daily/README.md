@@ -34,6 +34,12 @@ python forecast_daily/train_daily.py --model gnn --epochs 50 --train-end auto
 python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-end auto
 ```
 
+Optional anti-lag variant (encourages faster response to day-to-day changes):
+
+```bash
+python forecast_daily/generate_results.py --epochs 50 --delta-loss-weight 0.35
+```
+
 Outputs are written under forecast_daily/results by default.
 
 ## Plots

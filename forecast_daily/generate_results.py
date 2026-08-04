@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # Allow imports from project root and local model folders.
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,6 +93,7 @@ def train_one_model(
     epochs: int,
     lr: float,
     device: str,
+    delta_loss_weight: float,
 ) -> tuple[nn.Module, dict, pd.DataFrame]:
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -102,20 +104,34 @@ def train_one_model(
 
     model = model.to(device)
 
+    def temporal_delta_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # Penalize day-to-day slope mismatch to reduce 1-day-late reactions.
+        if pred.shape[0] < 2:
+            return torch.zeros((), device=pred.device)
+        pred_delta = pred[1:] - pred[:-1]
+        target_delta = target[1:] - target[:-1]
+        return F.l1_loss(pred_delta, target_delta)
+
     for epoch in range(1, epochs + 1):
         model.train()
         running = 0.0
+        running_delta = 0.0
         n = 0
         for xb, yb in train_loader:
             xb, yb = xb.to(device), yb.to(device)
             opt.zero_grad()
-            loss = loss_fn(model(xb), yb)
+            pred = model(xb)
+            point_loss = loss_fn(pred, yb)
+            delta_loss = temporal_delta_loss(pred, yb)
+            loss = point_loss + delta_loss_weight * delta_loss
             loss.backward()
             opt.step()
-            running += float(loss.item()) * len(xb)
+            running += float(point_loss.item()) * len(xb)
+            running_delta += float(delta_loss.item()) * len(xb)
             n += len(xb)
 
         train_mse = running / max(1, n)
+        train_delta_l1 = running_delta / max(1, n)
         test_mse, test_mae = evaluate_scaled(model, test_loader, device)
         history_train_mse.append(train_mse)
         history_test_mse.append(test_mse)
@@ -124,7 +140,8 @@ def train_one_model(
         if epoch == 1 or epoch % 10 == 0 or epoch == epochs:
             print(
                 f"[{name}] epoch {epoch:3d}/{epochs} "
-                f"train_mse={train_mse:.4f} test_mse={test_mse:.4f} test_mae={test_mae:.4f}"
+                f"train_mse={train_mse:.4f} train_delta_l1={train_delta_l1:.4f} "
+                f"test_mse={test_mse:.4f} test_mae={test_mae:.4f}"
             )
 
     pred_scaled, true_scaled = predict_scaled(model, test_loader, device)
@@ -334,6 +351,12 @@ def main() -> None:
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument(
+        "--delta-loss-weight",
+        type=float,
+        default=0.35,
+        help="Weight for day-to-day slope matching loss to reduce lagged reactions.",
+    )
+    p.add_argument(
         "--train-end",
         type=str,
         default="auto",
@@ -412,6 +435,7 @@ def main() -> None:
             epochs=args.epochs,
             lr=args.lr,
             device=device,
+            delta_loss_weight=args.delta_loss_weight,
         )
 
         ckpt_dir = results_dir / "checkpoints"
