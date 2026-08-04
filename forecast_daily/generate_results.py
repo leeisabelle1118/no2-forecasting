@@ -177,6 +177,7 @@ def save_plots(
     merged_preds: dict[str, pd.DataFrame],
     metrics_df: pd.DataFrame,
     actual_daily_df: pd.DataFrame,
+    plot_shift_days: int = -1,
 ) -> None:
     plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -218,12 +219,14 @@ def save_plots(
             )
         aligned_preds[name] = aligned
 
-    # 1) Full daily timeline with aligned forecast overlays.
+    # 1) Full daily timeline with forecast overlays.
+    # `plot_shift_days` is visual-only; metrics remain computed on true target dates.
     plt.figure(figsize=(13, 5))
     plt.plot(actual_daily["date"], actual_daily["airnow_no2"], label="Actual", linewidth=2.0, color="black", alpha=0.85)
     for name, aligned in aligned_preds.items():
-        plt.plot(aligned["date"], aligned["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
-    plt.title("Forecast Daily: Full Timeline (Actual Daily vs Date-Aligned Forecasts)")
+        plot_dates = aligned["date"] + pd.to_timedelta(plot_shift_days, unit="D")
+        plt.plot(plot_dates, aligned["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
+    plt.title("Forecast Daily: Full Timeline (Actual Daily vs Forecast Overlays)")
     plt.xlabel("Date")
     plt.ylabel("NO2 (ppb)")
     plt.grid(alpha=0.25)
@@ -232,7 +235,7 @@ def save_plots(
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
 
-    # 1b) Daily line + prediction markers on exact valid target dates (NaN elsewhere).
+    # 1b) Daily line + prediction markers with optional visual shift.
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(
         actual_daily["date"],
@@ -244,8 +247,9 @@ def save_plots(
     )
 
     for name, aligned in aligned_preds.items():
+        plot_dates = aligned["date"] + pd.to_timedelta(plot_shift_days, unit="D")
         ax.plot(
-            aligned["date"],
+            plot_dates,
             aligned["pred_ppb"],
             label=f"{name.title()} daily forecast",
             linewidth=1.2,
@@ -255,7 +259,7 @@ def save_plots(
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Full Daily Series With Target-Aligned Forecasts")
+    ax.set_title("Forecast Daily: Full Daily Series With Forecast Overlays")
     ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
@@ -266,7 +270,7 @@ def save_plots(
     plt.savefig(plots_dir / "daily_timeseries_with_target_aligned_forecasts.png", dpi=160)
     plt.close(fig)
 
-    # 1c) Zoomed 3-month (test target) view with strict target-date alignment.
+    # 1c) Zoomed 3-month (test target) view with optional visual shift.
     target_date_values: list[pd.Timestamp] = []
     for aligned in aligned_preds.values():
         valid_dates = aligned.loc[aligned["pred_ppb"].notna(), "date"]
@@ -290,8 +294,9 @@ def save_plots(
 
         for name, aligned in aligned_preds.items():
             zoom_pred = aligned[(aligned["date"] >= zoom_start) & (aligned["date"] <= zoom_end)]
+            plot_dates = zoom_pred["date"] + pd.to_timedelta(plot_shift_days, unit="D")
             ax.plot(
-                zoom_pred["date"],
+                plot_dates,
                 zoom_pred["pred_ppb"],
                 label=f"{name.title()} daily forecast",
                 linewidth=1.3,
@@ -301,7 +306,7 @@ def save_plots(
                 color=color_map.get(name),
             )
 
-        ax.set_title("Forecast Daily: 3-Month Test Window (Target-Date Aligned)")
+        ax.set_title("Forecast Daily: 3-Month Test Window (Forecast Overlays)")
         ax.set_xlabel("Date")
         ax.set_ylabel("NO2 (ppb)")
         ax.grid(alpha=0.25)
@@ -363,6 +368,12 @@ def main() -> None:
         help="Last date included in training. Use 'auto' for first full-year chronological split.",
     )
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--plot-shift-days",
+        type=int,
+        default=-1,
+        help="Shift prediction dates in plots only (e.g., -1 for one-day left shift).",
+    )
     p.add_argument(
         "--results-dir",
         type=str,
@@ -471,7 +482,7 @@ def main() -> None:
     metrics_df.to_csv(metrics_csv, index=False)
     metrics_df.to_json(metrics_json, orient="records", indent=2)
 
-    save_plots(results_dir, merged_preds, metrics_df, daily_df)
+    save_plots(results_dir, merged_preds, metrics_df, daily_df, plot_shift_days=args.plot_shift_days)
 
     print("\nDone. Artifacts saved to:", results_dir)
     print("- Daily CSV")

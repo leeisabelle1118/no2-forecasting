@@ -20,6 +20,12 @@ Optional anti-lag setting:
 python forecast_daily/generate_results.py --epochs 50 --delta-loss-weight 0.35
 ```
 
+Optional visual date shift (left-shift prediction curves in plots only):
+
+```bash
+python forecast_daily/generate_results.py --epochs 50 --plot-shift-days -1
+```
+
 Methodology pipeline:
 1. Build one canonical daily NO2 mean series (site-mean values per day).
 2. Keep one scalar NO2 value per day as the only model input channel.
@@ -36,6 +42,10 @@ Methodology pipeline:
 
 Anti-lag note:
 - Training uses a small day-to-day slope matching term (`--delta-loss-weight`) so predictions react faster to rises/drops instead of trailing by one day.
+
+Plot-shift note:
+- `--plot-shift-days` changes plotted prediction dates only (default `-1` for one-day left shift).
+- Reported metrics remain computed on true t+1 target dates from `predictions_*.csv`.
 
 ## Model results (this run)
 
@@ -60,7 +70,7 @@ Quick takeaways:
 
 What this plot is:
 - Black line: actual daily NO2 across the full daily train+test timeline.
-- Colored lines: each model prediction on target dates only (NaN on non-target dates).
+- Colored lines: each model prediction overlaid with optional visual date shift.
 
 How to interpret:
 - Better models follow the black line shape, peaks, and dips.
@@ -76,10 +86,10 @@ What to look for in this run:
 
 What this plot is:
 - Gray line: actual daily mean NO2 across the full daily train+test timeline.
-- Colored markers/lines: each model's daily forecast values on target dates only.
+- Colored markers/lines: each model's daily forecast values with optional visual date shift.
 
 How to interpret:
-- Forecast points must align to the target date, not the last input date.
+- Forecast points may be intentionally shifted left/right for visualization when `--plot-shift-days` is used.
 - No forecast values should appear before the test target window.
 - Any visible right-shift or left-shift against daily dates indicates an alignment bug.
 - Gaps before the first test target date are expected and confirm correct alignment.
