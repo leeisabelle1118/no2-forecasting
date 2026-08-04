@@ -17,85 +17,75 @@ python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 
 Methodology pipeline:
 1. Load hourly AirNow NO2 data from NetCDF files and compute the hourly mean across sites.
 2. Build direct one-step daily supervision samples:
-   - input for sample d: one full day of hourly NO2 values (24 x 1)
-   - target for sample d: next-day daily mean NO2 (day d+1)
-   - one prediction target per valid day, no recursive multi-step rollout
-3. Split chronologically using the first full calendar year of available daily target dates (`--train-end auto`):
-   - for the current AirNow range, training resolves to 2023-07-01 through 2024-06-30
-   - testing is the remaining tail (currently 2024-07-01 through 2024-09-30)
-4. Fit min-max scaling on training data only, then apply to train and test.
+   - **Predictor (X):** one full day of 24 hourly NO2 values for day d — shape `(24, 1)`
+   - **Target (y):** daily mean NO2 for day d+1
+   - **Mapping:** day 0 hourly values → predict day 1, day 1 hourly values → predict day 2, …
+   - One prediction target per valid day; no recursive multi-step rollout.
+3. Split chronologically by target date using the first full calendar year (`--train-end auto`):
+   - For the current AirNow range, training resolves to target dates 2023-07-02 through 2024-06-30.
+   - Testing is the remaining tail (target dates 2024-07-01 onward).
+   - The first input day (2023-07-01) is a predictor day only; its target is 2023-07-02.
+4. Fit min-max scaling on training data only (inputs and targets together), then apply to train and test.
 5. Train each model on the same split and evaluate on the same test period.
-6. Save predictions, metrics, checkpoints, and plots.
+6. Save predictions keyed to their actual target dates, metrics, checkpoints, and plots.
 
-## Model results (this run)
+## Guardrails
 
-From metrics.csv:
+The pipeline enforces the following assertions at runtime and will raise `ValueError` if violated:
+- `forecast_horizon_days == 1`: exactly one-step-ahead (t+1) direct forecasting.
+- `len(target_dates) == len(dataset)`: one prediction per test sample.
+- All test target dates are strictly after `train_end`.
+- Train and test splits are both non-empty and time-ordered.
+- Train targets and test targets do not overlap.
 
-| Model | Epochs | Test MAE (ppb) | Test RMSE (ppb) |
-|---|---:|---:|---:|
-| Transformer | 1 | 1.695 | 1.980 |
-| Mamba | 1 | 2.201 | 2.439 |
-| GNN | 1 | 5.207 | 5.309 |
+## Plots
 
-Quick takeaways:
-- Transformer performs best in this quick 1-epoch check.
-- Mamba is second on both MAE and RMSE.
-- GNN underperforms in this short run and likely needs longer training.
-
-## Graphs and how to interpret them
-
-### 1) Time-series comparison
+### 1) Full-year time-series comparison
 
 ![Time Series Comparison](plots/timeseries_all_models.png)
 
-What this plot is:
-- Black line: actual daily NO2 across the full timeline.
-- Colored lines: each model's one-step predictions only on their target dates (NaN elsewhere).
+What this plot shows:
+- **Black line:** actual daily mean NO2 across the full available timeline (train + test).
+- **Colored lines:** each model's one-step-ahead predictions, plotted only on their target dates.
+  Days with no prediction (i.e., before the first test target date) appear as gaps — this is correct.
 
 How to interpret:
-- Better models follow the black line shape, peaks, and dips.
-- If peaks are shifted right, the model has lag.
-- If peaks are too low/high, the model under/overestimates amplitude.
+- Better models follow the black line's shape, peaks, and dips over the test window.
+- If forecast peaks are shifted right relative to actual peaks, the model has temporal lag.
+- If peaks are too low or high, the model is under/over-estimating amplitude.
 
-What to look for in this run:
-- Mamba and GNN generally track observed changes more closely than Transformer.
-
-### 1b) Daily forecast overlay
+### 1b) Daily forecast overlay with markers
 
 ![Hourly Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
 
-What this plot is:
-- Gray line: actual daily NO2 across the full timeline.
-- Colored lines/markers: each model's daily one-step forecasts on target dates only (NaN on non-target dates).
+What this plot shows:
+- **Gray line:** actual daily mean NO2 across the full timeline.
+- **Colored lines with markers:** each model's daily one-step forecast on target dates only.
 
 How to interpret:
-- This panel emphasizes date alignment and start-of-forecast behavior.
-- Forecast points should begin at the first valid target day and not appear on earlier days.
-- Any right-shift relative to actual daily dates indicates an alignment issue.
+- Markers should begin at the first valid test target date and align exactly with the actual series date axis.
+- No right-shift should be present: each predicted point sits on the date it was forecast for.
 
 ### 2) Scatter (actual vs predicted)
 
 ![Scatter Comparison](plots/scatter_all_models.png)
 
-What this plot is:
+What this plot shows:
 - One panel per model.
-- X-axis: actual NO2.
-- Y-axis: predicted NO2.
+- X-axis: actual NO2 (ppb).
+- Y-axis: predicted NO2 (ppb).
 - Red dashed line: perfect prediction (y = x).
 
 How to interpret:
 - Points near the red line indicate accurate predictions.
 - Wide spread means higher error variance.
-- Systematic points below the line at high actual values indicate peak underprediction.
-
-What to look for in this run:
-- GNN and Mamba point clouds are tighter than Transformer overall.
+- Points systematically below the line at high actual values indicate peak underprediction.
 
 ### 3) Metrics bar chart
 
 ![Metrics Bar Chart](plots/metrics_bar.png)
 
-What this plot is:
+What this plot shows:
 - Side-by-side MAE and RMSE bars for each model.
 
 How to interpret:
@@ -103,19 +93,14 @@ How to interpret:
 - Lower RMSE = fewer or smaller large errors.
 - If RMSE is much larger than MAE, large outliers are likely present.
 
-What to look for in this run:
-- Mamba leads on MAE.
-- GNN leads on RMSE.
-- Transformer trails both error metrics.
-
 ## Key output files
 
-- airnow_no2_daily_mean.csv: Daily series used for training/testing.
-- predictions_transformer.csv, predictions_mamba.csv, predictions_gnn.csv: test predictions with dates and actuals.
-- metrics.csv and metrics.json: summary metrics and ranking.
-- history_*.json: per-epoch train/test curves.
-- checkpoints/*.pt: trained model weights.
-- plots/*.png: visual diagnostics.
+- `airnow_no2_daily_mean.csv`: Daily mean NO2 series (used for the actual line in plots).
+- `predictions_transformer.csv`, `predictions_mamba.csv`, `predictions_gnn.csv`: test predictions with target dates and actuals.
+- `metrics.csv` and `metrics.json`: summary metrics and model ranking.
+- `history_*.json`: per-epoch train/test loss curves.
+- `checkpoints/*.pt`: trained model weights.
+- `plots/*.png`: visual diagnostics.
 
 ## Re-running experiments
 
@@ -125,8 +110,11 @@ Default results folder:
 python forecast_daily/generate_results.py --epochs 50
 ```
 
-Longer run in a separate folder (recommended):
+Longer run in a separate folder (recommended for experiments):
 
 ```bash
 python forecast_daily/generate_results.py --epochs 200 --results-dir results_longrun
 ```
+
+Note: experiment subdirectories (`results_*/`) are excluded from git by `.gitignore`.
+
