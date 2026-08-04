@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import torch
@@ -20,7 +21,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data.load_airnow import load_all
 from gnn.train_gnn_daily import DailyGNN
 from mamba.train_mamba_daily import DailyMambaLike
-from transformer.daily_data import LEAD_DAYS, LOOKBACK_DAYS, chronological_split, make_dataloaders, prepare_series
+from transformer.daily_data import (
+    LEAD_DAYS,
+    LOOKBACK_DAYS,
+    chronological_split,
+    make_dataloaders,
+    prepare_series,
+    resolve_train_end,
+)
 from transformer.train_transformer_daily import DailyTransformer
 
 
@@ -38,6 +46,14 @@ def build_daily_series() -> pd.DataFrame:
     daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
     daily = pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values})
     return daily.reset_index(drop=True)
+
+
+def build_hourly_series() -> pd.DataFrame:
+    """Create an hourly mean NO2 series across all sites for plotting."""
+    df_hourly = load_all()
+    hourly_mean = df_hourly.mean(axis=1).dropna().sort_index()
+    hourly = pd.DataFrame({"date": hourly_mean.index, "airnow_no2": hourly_mean.values})
+    return hourly.reset_index(drop=True)
 
 
 def evaluate_scaled(model: nn.Module, loader, device: str) -> tuple[float, float]:
@@ -73,9 +89,15 @@ def predict_scaled(model: nn.Module, loader, device: str) -> tuple[np.ndarray, n
     return np.concatenate(preds), np.concatenate(trues)
 
 
-def target_dates_for_test(df: pd.DataFrame, train_ratio: float) -> pd.Series:
+def target_dates_for_test(df: pd.DataFrame, train_end: str | pd.Timestamp | None = "auto") -> pd.Series:
+    """Backward-compatible fallback for obtaining test target dates.
+
+    The preferred source is the dataset's own `target_dates` attribute, which
+    is attached by `make_dataloaders()` and guarantees alignment to the actual
+    forecast target index.
+    """
     ordered = prepare_series(df)
-    _, test_df = chronological_split(ordered, train_ratio=train_ratio)
+    _, test_df = chronological_split(ordered, train_end=train_end)
     target_start = LOOKBACK_DAYS + LEAD_DAYS - 1
     if len(test_df) <= target_start:
         return pd.Series(dtype="datetime64[ns]")
@@ -162,6 +184,8 @@ def save_plots(results_dir: Path, merged_preds: dict[str, pd.DataFrame], metrics
     plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
+    hourly_df = build_hourly_series()
+
     # 1) Combined test time-series plot
     plt.figure(figsize=(13, 5))
     first_model = next(iter(merged_preds))
@@ -182,6 +206,55 @@ def save_plots(results_dir: Path, merged_preds: dict[str, pd.DataFrame], metrics
     plt.tight_layout()
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
+
+    # 1b) Hourly series with daily forecast points overlaid
+    fig, ax = plt.subplots(figsize=(14, 5))
+    ax.plot(
+        hourly_df["date"],
+        hourly_df["airnow_no2"],
+        label="Actual hourly mean",
+        color="black",
+        linewidth=0.7,
+        alpha=0.75,
+    )
+
+    hourly_daily = hourly_df.set_index("date").resample("D").mean().dropna().reset_index()
+    ax.plot(
+        hourly_daily["date"],
+        hourly_daily["airnow_no2"],
+        label="Actual daily mean",
+        color="dimgray",
+        linewidth=1.8,
+        alpha=0.85,
+    )
+
+    color_map = {
+        "transformer": "tab:blue",
+        "mamba": "tab:orange",
+        "gnn": "tab:green",
+    }
+    for name, dfp in merged_preds.items():
+        ax.plot(
+            pd.to_datetime(dfp["date"]),
+            dfp["pred_ppb"],
+            label=f"{name.title()} daily forecast",
+            linewidth=0,
+            marker="o",
+            markersize=3.2,
+            alpha=0.9,
+            color=color_map.get(name),
+        )
+
+    ax.set_title("Forecast Daily: Hourly Time Series With Daily Forecast Targets")
+    ax.set_xlabel("Date / Hour")
+    ax.set_ylabel("NO2 (ppb)")
+    ax.grid(alpha=0.25)
+    ax.legend(ncol=2, fontsize=9)
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
+    ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+    plt.tight_layout()
+    plt.savefig(plots_dir / "hourly_timeseries_with_daily_forecasts.png", dpi=160)
+    plt.close(fig)
 
     # 2) Per-model scatter plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True, sharey=True)
@@ -221,7 +294,12 @@ def main() -> None:
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--train-ratio", type=float, default=0.8)
+    p.add_argument(
+        "--train-end",
+        type=str,
+        default="auto",
+        help="Last date included in training. Use 'auto' for first full-year chronological split.",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--results-dir",
@@ -239,6 +317,8 @@ def main() -> None:
 
     print("Building daily series from AirNow hourly NetCDF files...")
     daily_df = build_daily_series()
+    effective_train_end = resolve_train_end(prepare_series(daily_df), train_end=args.train_end)
+    print(f"Using train_end={effective_train_end.date()} (chronological split)")
     daily_csv = results_dir / "airnow_no2_daily_mean.csv"
     daily_df.to_csv(daily_csv, index=False)
     print(f"Saved daily CSV: {daily_csv}")
@@ -246,17 +326,29 @@ def main() -> None:
     train_loader, test_loader, scaler = make_dataloaders(
         daily_df,
         batch_size=args.batch_size,
-        train_ratio=args.train_ratio,
+        train_end=args.train_end,
     )
-    target_dates = target_dates_for_test(daily_df, args.train_ratio)
+    input_dim = int(train_loader.dataset.X.shape[-1])
+    target_dates = getattr(test_loader.dataset, "target_dates", None)
+    if target_dates is None:
+        target_dates = target_dates_for_test(daily_df, args.train_end)
+    else:
+        target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
+
+    if not target_dates.empty and (target_dates <= effective_train_end).any():
+        bad = target_dates[target_dates <= effective_train_end].iloc[0]
+        raise ValueError(
+            "Evaluation includes non-future target date. "
+            f"Found target_date={pd.Timestamp(bad).date()} <= train_end={effective_train_end.date()}"
+        )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
     model_map: dict[str, nn.Module] = {
-        "transformer": DailyTransformer(),
-        "mamba": DailyMambaLike(),
-        "gnn": DailyGNN(),
+        "transformer": DailyTransformer(input_dim=input_dim),
+        "mamba": DailyMambaLike(input_dim=input_dim),
+        "gnn": DailyGNN(input_dim=input_dim),
     }
 
     metrics_records: list[dict] = []
@@ -280,7 +372,11 @@ def main() -> None:
         ckpt_path = ckpt_dir / f"{name}_daily.pt"
         torch.save(trained_model.state_dict(), ckpt_path)
 
-        pred_df.insert(0, "date", target_dates.values[: len(pred_df)])
+        if len(target_dates) != len(pred_df):
+            raise ValueError(
+                f"Target-date length mismatch for {name}: dates={len(target_dates)} predictions={len(pred_df)}"
+            )
+        pred_df.insert(0, "date", target_dates.values)
         pred_path = results_dir / f"predictions_{name}.csv"
         pred_df.to_csv(pred_path, index=False)
 

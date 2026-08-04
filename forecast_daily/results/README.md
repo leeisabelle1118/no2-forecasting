@@ -11,18 +11,20 @@ for three models:
 All results in this folder were produced by running:
 
 ```bash
-python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-ratio 0.8
+python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 --train-end auto
 ```
 
 Methodology pipeline:
 1. Load hourly AirNow NO2 data from NetCDF files.
 2. Aggregate to one daily series by taking the mean across sites and then daily averaging.
-3. Build a univariate dataset with:
+3. Build a multivariate dataset with:
    - lookback window K = 7 days
    - forecast horizon H = 1 day
-4. Split chronologically (no shuffle):
-   - first 80% of days for training
-   - last 20% of days for testing
+   - calendar covariates: month, day of week, day of year, weekend flag, and seasonal sine/cosine features
+   - optional weather covariates when present in the input table
+4. Split chronologically using the first full calendar year of available daily data (`--train-end auto`):
+   - for the current AirNow range, training resolves to 2023-07-01 through 2024-06-30
+   - testing is the remaining tail (currently 2024-07-01 through 2024-09-30)
 5. Fit min-max scaling on training data only, then apply to train and test.
 6. Train each model on the same split and evaluate on the same test period.
 7. Save predictions, metrics, checkpoints, and plots.
@@ -59,6 +61,20 @@ How to interpret:
 
 What to look for in this run:
 - Mamba and GNN generally track observed changes more closely than Transformer.
+
+### 1b) Hourly time-series diagnostic
+
+![Hourly Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
+
+What this plot is:
+- Black line: hourly AirNow mean across all sites.
+- Gray line: daily mean aggregated from the hourly series.
+- Colored markers: each model's daily forecast target dates.
+
+How to interpret:
+- This gives a denser hourly view of the same period shown in the daily comparison.
+- The forecast markers are aligned to the target date, not the last input date.
+- If the forecast markers appear shifted right or left relative to the daily series, that indicates a date alignment bug.
 
 ### 2) Scatter (actual vs predicted)
 

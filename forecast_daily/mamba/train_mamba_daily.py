@@ -8,21 +8,24 @@ import pandas as pd
 import torch
 import torch.nn as nn
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from data.load_airnow import load_all
 from daily_data import make_dataloaders
 
 
 class DailyMambaLike(nn.Module):
-    """Lightweight sequence model for daily univariate forecasting.
+    """Lightweight sequence model for daily multivariate forecasting.
 
     This is a practical stand-in for daily experimentation where a dedicated
     mamba package may not be installed.
     """
 
-    def __init__(self, hidden_size: int = 64, num_layers: int = 2):
+    def __init__(self, input_dim: int = 1, hidden_size: int = 64, num_layers: int = 2):
         super().__init__()
         self.rnn = nn.GRU(
-            input_size=1,
+            input_size=input_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
@@ -52,24 +55,60 @@ def evaluate(model: nn.Module, loader, device: str) -> tuple[float, float]:
     return total_mse / max(1, n), total_mae / max(1, n)
 
 
+def build_daily_series() -> pd.DataFrame:
+    """Build daily mean NO2 across all AirNow sites from the full archive."""
+    df_hourly = load_all()
+    daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
+    return pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values}).reset_index(drop=True)
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--csv", required=True, help="Path to csv with columns: date, airnow_no2")
+    p.add_argument(
+        "--csv",
+        default=None,
+        help="Optional CSV with columns: date, airnow_no2. If omitted, loads full AirNow daily series.",
+    )
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--train-ratio", type=float, default=0.8)
+    p.add_argument(
+        "--train-end",
+        type=str,
+        default="auto",
+        help="Last date included in training. Use 'auto' for first full-year chronological split.",
+    )
     args = p.parse_args()
 
-    df = pd.read_csv(args.csv)
+    if args.csv:
+        df = pd.read_csv(args.csv)
+        source = args.csv
+    else:
+        df = build_daily_series()
+        source = "AirNow NetCDF archive"
+
+    dates = pd.to_datetime(df["date"])
+    print(f"Loaded daily NO2 from {source}: rows={len(df)}, range={dates.min().date()} to {dates.max().date()}")
+
     train_loader, test_loader, _ = make_dataloaders(
         df,
         batch_size=args.batch_size,
-        train_ratio=args.train_ratio,
+        train_end=args.train_end,
     )
+    split_train_end = getattr(train_loader.dataset, "split_train_end", None)
+    test_target_dates = getattr(test_loader.dataset, "target_dates", None)
+    if split_train_end is not None and test_target_dates is not None:
+        test_target_dates = pd.Series(pd.to_datetime(test_target_dates))
+        if not test_target_dates.empty and (test_target_dates <= pd.Timestamp(split_train_end)).any():
+            bad = test_target_dates[test_target_dates <= pd.Timestamp(split_train_end)].iloc[0]
+            raise ValueError(
+                "Evaluation includes non-future target date. "
+                f"Found target_date={pd.Timestamp(bad).date()} <= train_end={pd.Timestamp(split_train_end).date()}"
+            )
+    input_dim = int(train_loader.dataset.X.shape[-1])
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = DailyMambaLike().to(device)
+    model = DailyMambaLike(input_dim=input_dim).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     loss_fn = nn.MSELoss()
 
