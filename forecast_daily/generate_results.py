@@ -41,8 +41,8 @@ def set_seed(seed: int = 42) -> None:
 
 
 def build_daily_series() -> pd.DataFrame:
-    """Create a univariate daily NO2 series from hourly multi-site AirNow data."""
-    df_hourly = load_all()  # index: hourly timestamps, columns: site codes
+    """Create the canonical daily NO2 series used by forecast_daily models."""
+    df_hourly = load_all()  # raw archive timestamps, columns: site codes
     daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
     daily = pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values})
     return daily.reset_index(drop=True)
@@ -197,6 +197,14 @@ def save_plots(
         tmp["date"] = pd.to_datetime(tmp["date"])
         tmp = tmp.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
         tmp["pred_ppb"] = pd.to_numeric(tmp["pred_ppb"], errors="coerce")
+
+        unknown_target_dates = tmp.loc[~tmp["date"].isin(actual_daily["date"]), "date"]
+        if not unknown_target_dates.empty:
+            bad = pd.Timestamp(unknown_target_dates.iloc[0]).date()
+            raise ValueError(
+                f"Prediction target date outside daily timeline for {name}: {bad}"
+            )
+
         aligned = actual_daily[["date"]].merge(
             tmp[["date", "pred_ppb"]],
             on="date",
@@ -224,7 +232,7 @@ def save_plots(
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
 
-    # 1b) Daily line + prediction markers on exact target dates (NaN elsewhere).
+    # 1b) Daily line + prediction markers on exact valid target dates (NaN elsewhere).
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(
         actual_daily["date"],
@@ -247,7 +255,7 @@ def save_plots(
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Full-Year Daily Series With Forecast Targets")
+    ax.set_title("Forecast Daily: Full Daily Series With Target-Aligned Forecasts")
     ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
@@ -255,7 +263,7 @@ def save_plots(
     ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
     ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
     plt.tight_layout()
-    plt.savefig(plots_dir / "hourly_timeseries_with_daily_forecasts.png", dpi=160)
+    plt.savefig(plots_dir / "daily_timeseries_with_target_aligned_forecasts.png", dpi=160)
     plt.close(fig)
 
     # 2) Per-model scatter plot
@@ -317,7 +325,7 @@ def main() -> None:
     results_dir = root / args.results_dir
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Building daily series from AirNow hourly NetCDF files...")
+    print("Building canonical daily NO2 series for direct t+1 forecasting...")
     daily_df = build_daily_series()
     effective_train_end = resolve_train_end(prepare_series(daily_df), train_end=args.train_end)
     print(f"Using train_end={effective_train_end.date()} (chronological split)")

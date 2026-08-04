@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Run daily forecasting training by model")
+    p = argparse.ArgumentParser(description="Run daily lagged (K=7) direct t+1 forecasting training by model")
     p.add_argument("--model", choices=["transformer", "mamba", "gnn"], required=True)
     p.add_argument("--csv", default=None, help="Optional CSV with columns: date, airnow_no2")
     p.add_argument("--epochs", type=int, default=50)

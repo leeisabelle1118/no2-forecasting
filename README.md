@@ -133,6 +133,10 @@ NO2 Forecasting/
 ├── outputs/                  # Checkpoints (.pt), training history (.json),
 │                             # comparison plots (.png)  — gitignored
 ├── plots/                    # EDA figures saved by the notebooks — gitignored
+├── forecast_daily/           # Daily lagged pipeline (K=7, direct t+1)
+│   ├── README.md             # Daily pipeline overview and commands
+│   ├── train_daily.py        # Run daily model training by architecture
+│   └── generate_results.py   # Train/evaluate all daily models + plots
 ├── train.py                  # CLI training script (Transformer, Mamba, or GNN)
 ├── predict.py                # Load a checkpoint and forecast a date range
 ├── compare.py                # Load checkpoints, compare MSE/MAE, save plots
@@ -141,6 +145,17 @@ NO2 Forecasting/
 ├── GRAPHS_GUIDE.md           # Plain-language guide to every plot (notebooks 01–03)
 └── LICENSE                   # MIT
 ```
+
+## Daily Forecasting Track
+
+The folder forecast_daily is the canonical daily lagged forecasting setup:
+- lookback K = 7 daily rows
+- target horizon H = 1 day (direct t+1)
+- no hourly-to-daily supervision and no recursive rollout
+
+Start with forecast_daily/README.md for commands and artifact descriptions,
+and use forecast_daily/results/README.md for run-level metric and plot
+interpretation.
 
 ---
 

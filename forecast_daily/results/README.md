@@ -15,8 +15,8 @@ python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 
 ```
 
 Methodology pipeline:
-1. Load hourly AirNow NO2 data from NetCDF files.
-2. Aggregate to one daily mean series (site-mean hourly values resampled to daily means).
+1. Build one canonical daily NO2 mean series (site-mean values per day).
+2. Use only daily-to-daily supervision (no hourly-to-daily supervision).
 3. Build direct one-step daily supervision using lagged daily windows:
    - input window K = 7 past daily rows
    - target horizon H = 1 day ahead (direct t+1)
@@ -69,7 +69,7 @@ What to look for in this run:
 
 ### 1b) Daily time-series diagnostic
 
-![Daily Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
+![Daily Time Series](plots/daily_timeseries_with_target_aligned_forecasts.png)
 
 What this plot is:
 - Gray line: actual daily mean NO2 across the full timeline.
@@ -79,9 +79,6 @@ How to interpret:
 - Forecast points must align to the target date, not the last input date.
 - No forecast values should appear before the test target window.
 - Any visible right-shift or left-shift against daily dates indicates an alignment bug.
-
-Note:
-- The filename `hourly_timeseries_with_daily_forecasts.png` is a legacy artifact name; the current figure is daily-timeline based.
 
 ### 2) Scatter (actual vs predicted)
 
@@ -126,7 +123,7 @@ What to look for in this run:
 - history_*.json: per-epoch train/test curves.
 - checkpoints/*.pt: trained model weights.
 - plots/timeseries_all_models.png: full-timeline daily actual line with date-aligned prediction overlays.
-- plots/hourly_timeseries_with_daily_forecasts.png: daily-line diagnostic with target-date forecast markers.
+- plots/daily_timeseries_with_target_aligned_forecasts.png: daily-line diagnostic with target-date forecast markers.
 - plots/scatter_all_models.png and plots/metrics_bar.png: accuracy diagnostics.
 
 ## Re-running experiments

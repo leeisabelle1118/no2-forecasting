@@ -54,7 +54,7 @@ def evaluate(model: nn.Module, loader, device: str) -> tuple[float, float]:
 
 
 def build_daily_series() -> pd.DataFrame:
-    """Build daily mean NO2 across all AirNow sites from the full archive."""
+    """Build the canonical daily NO2 mean series used for K=7, direct t+1 forecasting."""
     df_hourly = load_all()
     daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
     return pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values}).reset_index(drop=True)
