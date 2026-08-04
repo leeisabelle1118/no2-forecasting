@@ -111,35 +111,67 @@ day-to-day and hour-to-hour pollution events.
 ## Project structure
 
 ```
-NO2 Forecasting/
-├── data/
+no2-forecasting/
+├── README.md
+├── RESULTS.md
+├── LICENSE
+├── .gitignore
+├── environment.yml
+├── requirements.txt
+│
+├── models/                        # Model architecture definitions
 │   ├── __init__.py
-│   └── load_airnow.py        # load_all(), load_sequences(), site_meta()
-├── models/
+│   ├── transformer_no2.py         # Encoder-only Transformer (Vaswani et al. 2017)
+│   ├── mamba_no2.py               # Mamba SSM (Gu & Dao 2023), pure-PyTorch
+│   └── gnn_no2.py                 # k-NN GCN + GRU baseline
+│
+├── scripts/                       # Training, prediction, comparison, and map scripts
+│   ├── train.py                   # CLI training script (Transformer, Mamba, or GNN)
+│   ├── predict.py                 # Load a checkpoint and forecast a date range
+│   ├── compare.py                 # Load checkpoints, compare MSE/MAE, save plots
+│   ├── cartopy_maps.py            # Generate Cartopy spatial map figures
+│   ├── la_basin_no2_analysis.py   # LA Basin site analysis script
+│   └── forecast_daily/            # Daily forecasting pipeline
+│       ├── train_daily.py
+│       ├── generate_results.py
+│       ├── transformer/
+│       ├── mamba/
+│       ├── gnn/
+│       └── results/
+│
+├── notebooks/                     # Numbered Jupyter notebooks (01–09)
+│   ├── 01_explore_airnow.ipynb    # EDA: site map, time series, diurnal cycle
+│   ├── 02_no2_time_series.ipynb   # Extended time-series plots
+│   ├── 03_model_diagnostics.ipynb # Diagnostics: error decomposition, attention weights
+│   ├── 04_graphmamba_vs_observed.ipynb
+│   ├── 05_train_transformer.ipynb
+│   ├── 06_train_mamba.ipynb
+│   ├── 07_train_gnn.ipynb
+│   ├── 08_baseline_models.ipynb   # Baselines + met-feature correlations
+│   └── 09_la_basin_no2_analysis.ipynb  # LA Basin spatial NO₂ analysis
+│
+├── data/                          # Raw and processed AirNow data
 │   ├── __init__.py
-│   ├── transformer_no2.py    # Encoder-only Transformer (Vaswani et al. 2017)
-│   ├── mamba_no2.py          # Mamba SSM (Gu & Dao 2023), pure-PyTorch
-│   └── gnn_no2.py            # k-NN GCN + GRU baseline
-├── notebooks/
-│   ├── 01_explore_airnow.ipynb   # EDA: site map, time series, diurnal cycle,
-│   │                             #      missing data, model forward-pass check
-│   ├── 02_no2_time_series.ipynb  # Extended time-series plots: top-N sites,
-│   │                             #      regional trends, seasonal overlays,
-│   │                             #      rolling averages, anomaly detection
-│   ├── 03_model_diagnostics.ipynb # Diagnostics: error decomposition,
-│   │                              #      attention weights, residual ACF/PACF
-│   └── 08_baseline_models.ipynb   # Baselines + met-feature correlations,
-│                                  # incremental regression, 3-panel diagnostics
-├── outputs/                  # Checkpoints (.pt), training history (.json),
-│                             # comparison plots (.png)  — gitignored
-├── plots/                    # EDA figures saved by the notebooks — gitignored
-├── train.py                  # CLI training script (Transformer, Mamba, or GNN)
-├── predict.py                # Load a checkpoint and forecast a date range
-├── compare.py                # Load checkpoints, compare MSE/MAE, save plots
-├── environment.yml           # Conda environment spec
-├── requirements.txt          # pip fallback
-├── GRAPHS_GUIDE.md           # Plain-language guide to every plot (notebooks 01–03)
-└── LICENSE                   # MIT
+│   └── load_airnow.py             # load_all(), load_sequences(), site_meta()
+│
+└── outputs/
+    ├── figures/                   # All generated plots organized by type
+    │   ├── eda/                   # Exploratory data analysis plots
+    │   ├── training/              # Training curves and scatter plots
+    │   ├── forecasts/             # Per-site forecast plots
+    │   ├── cartopy/               # Cartopy spatial map figures
+    │   └── comparison/            # Model comparison plots
+    ├── metrics/                   # CSV and JSON result files
+    │   ├── baseline_models_comparison.csv
+    │   ├── comparison_results.json
+    │   ├── mamba_s24_p6_d128_history.json
+    │   └── transformer_s24_p6_d128_history.json
+    └── docs/                      # Supplementary documentation
+        ├── GRAPHS_GUIDE.md        # Plain-language guide to every plot
+        ├── LA_BASIN_GRAPHS_GUIDE.md
+        ├── COLOR_SCALE_REFERENCE.md
+        ├── MAP_EXPLANATION.md
+        └── TODO_COMPLETION.md
 ```
 
 ---
