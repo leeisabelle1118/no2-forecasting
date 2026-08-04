@@ -93,6 +93,10 @@ def main() -> None:
         batch_size=args.batch_size,
         train_end=args.train_end,
     )
+    horizon_days = getattr(test_loader.dataset, "forecast_horizon_days", None)
+    if horizon_days != 1:
+        raise ValueError(f"Expected direct one-step (t+1) forecasting; got horizon_days={horizon_days}")
+
     split_train_end = getattr(train_loader.dataset, "split_train_end", None)
     test_target_dates = getattr(test_loader.dataset, "target_dates", None)
     if split_train_end is not None and test_target_dates is not None:

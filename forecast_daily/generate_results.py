@@ -328,6 +328,10 @@ def main() -> None:
         batch_size=args.batch_size,
         train_end=args.train_end,
     )
+    horizon_days = getattr(test_loader.dataset, "forecast_horizon_days", None)
+    if horizon_days != 1:
+        raise ValueError(f"Expected direct one-step (t+1) forecasting; got horizon_days={horizon_days}")
+
     input_dim = int(train_loader.dataset.X.shape[-1])
     target_dates = getattr(test_loader.dataset, "target_dates", None)
     if target_dates is None:
@@ -340,6 +344,11 @@ def main() -> None:
         raise ValueError(
             "Evaluation includes non-future target date. "
             f"Found target_date={pd.Timestamp(bad).date()} <= train_end={effective_train_end.date()}"
+        )
+    if len(target_dates) != len(test_loader.dataset):
+        raise ValueError(
+            "One-step evaluation requires exactly one prediction target per test dataset row. "
+            f"target_dates={len(target_dates)} dataset_rows={len(test_loader.dataset)}"
         )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

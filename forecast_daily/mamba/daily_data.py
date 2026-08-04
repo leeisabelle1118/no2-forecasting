@@ -144,6 +144,10 @@ class AirNowNO2Dataset(Dataset):
         """
         if values_scaled.ndim != 1:
             raise ValueError("values_scaled must be a 1D array")
+        if lead != LEAD_DAYS:
+            raise ValueError(
+                f"forecast_daily supports direct one-step forecasting only (lead={LEAD_DAYS}); got lead={lead}"
+            )
         if feature_matrix.ndim != 2:
             raise ValueError("feature_matrix must be a 2D array")
         if feature_matrix.shape[0] != len(values_scaled):
@@ -262,6 +266,11 @@ def make_dataloaders(
     Input channels include lagged NO2 (always), optional calendar features,
     and optional weather features.
     """
+    if lead != LEAD_DAYS:
+        raise ValueError(
+            f"forecast_daily supports direct one-step forecasting only (lead={LEAD_DAYS}); got lead={lead}"
+        )
+
     df = prepare_series(df)
     if include_time_features:
         df = add_calendar_features(df)
@@ -341,6 +350,13 @@ def make_dataloaders(
     test_ds.weather_feature_columns = weather_cols
     train_ds.split_train_end = pd.Timestamp(train_df["date"].max())
     test_ds.split_test_start = pd.Timestamp(test_df["date"].min())
+    train_ds.forecast_horizon_days = LEAD_DAYS
+    test_ds.forecast_horizon_days = LEAD_DAYS
+    train_ds.forecast_mode = "direct_one_step_t_plus_1"
+    test_ds.forecast_mode = "direct_one_step_t_plus_1"
+
+    if train_ds.y.shape[1] != 1 or test_ds.y.shape[1] != 1:
+        raise ValueError("Direct one-step setup must produce scalar daily targets with shape (N, 1)")
 
     return train_loader, test_loader, scaler
 
