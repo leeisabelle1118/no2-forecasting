@@ -55,11 +55,11 @@ def evaluate(model: nn.Module, loader, device: str) -> tuple[float, float]:
     return total_mse / max(1, n), total_mae / max(1, n)
 
 
-def build_daily_series() -> pd.DataFrame:
-    """Build daily mean NO2 across all AirNow sites from the full archive."""
+def build_hourly_series() -> pd.DataFrame:
+    """Build hourly mean NO2 across all AirNow sites from the full archive."""
     df_hourly = load_all()
-    daily_mean = df_hourly.mean(axis=1).resample("D").mean().dropna()
-    return pd.DataFrame({"date": daily_mean.index, "airnow_no2": daily_mean.values}).reset_index(drop=True)
+    hourly_mean = df_hourly.mean(axis=1).dropna().sort_index()
+    return pd.DataFrame({"date": hourly_mean.index, "airnow_no2": hourly_mean.values}).reset_index(drop=True)
 
 
 def main() -> None:
@@ -67,7 +67,7 @@ def main() -> None:
     p.add_argument(
         "--csv",
         default=None,
-        help="Optional CSV with columns: date, airnow_no2. If omitted, loads full AirNow daily series.",
+        help="Optional hourly CSV with columns: date, airnow_no2. If omitted, loads full AirNow hourly series.",
     )
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch-size", type=int, default=32)
@@ -84,11 +84,11 @@ def main() -> None:
         df = pd.read_csv(args.csv)
         source = args.csv
     else:
-        df = build_daily_series()
+        df = build_hourly_series()
         source = "AirNow NetCDF archive"
 
     dates = pd.to_datetime(df["date"])
-    print(f"Loaded daily NO2 from {source}: rows={len(df)}, range={dates.min().date()} to {dates.max().date()}")
+    print(f"Loaded hourly NO2 from {source}: rows={len(df)}, range={dates.min()} to {dates.max()}")
 
     train_loader, test_loader, _ = make_dataloaders(
         df,

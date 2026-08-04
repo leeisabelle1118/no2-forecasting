@@ -1,35 +1,35 @@
 [
   {
-    "model":"gnn",
-    "epochs":50,
-    "test_mae_ppb":0.7449086905,
-    "test_rmse_ppb":0.9304160476,
-    "train_mse_scaled_last":0.0109436641,
-    "test_mse_scaled_last":0.0048688005,
-    "test_mae_scaled_last":0.0558646146,
-    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/gnn_daily.pt",
-    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_gnn.csv"
+    "model":"transformer",
+    "epochs":1,
+    "test_mae_ppb":1.6950141191,
+    "test_rmse_ppb":1.9795265198,
+    "train_mse_scaled_last":0.0668609673,
+    "test_mse_scaled_last":0.0104104585,
+    "test_mae_scaled_last":0.0873668919,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/transformer_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_transformer.csv"
   },
   {
     "model":"mamba",
-    "epochs":50,
-    "test_mae_ppb":0.7202004194,
-    "test_rmse_ppb":0.9340261221,
-    "train_mse_scaled_last":0.011958174,
-    "test_mse_scaled_last":0.0049066563,
-    "test_mae_scaled_last":0.0540116184,
+    "epochs":1,
+    "test_mae_ppb":2.2005178928,
+    "test_rmse_ppb":2.4388360977,
+    "train_mse_scaled_last":0.0259364706,
+    "test_mse_scaled_last":0.015802009,
+    "test_mae_scaled_last":0.1134222901,
     "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/mamba_daily.pt",
     "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_mamba.csv"
   },
   {
-    "model":"transformer",
-    "epochs":50,
-    "test_mae_ppb":0.9189836383,
-    "test_rmse_ppb":1.1180919409,
-    "train_mse_scaled_last":0.0150319087,
-    "test_mse_scaled_last":0.0070310903,
-    "test_mae_scaled_last":0.0689194048,
-    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/transformer_daily.pt",
-    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_transformer.csv"
+    "model":"gnn",
+    "epochs":1,
+    "test_mae_ppb":5.2072715759,
+    "test_rmse_ppb":5.3091254234,
+    "train_mse_scaled_last":0.1956865916,
+    "test_mse_scaled_last":0.0748847049,
+    "test_mae_scaled_last":0.2684008142,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/gnn_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_gnn.csv"
   }
 ]

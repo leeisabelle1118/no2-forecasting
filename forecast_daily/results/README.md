@@ -15,19 +15,17 @@ python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 
 ```
 
 Methodology pipeline:
-1. Load hourly AirNow NO2 data from NetCDF files.
-2. Aggregate to one daily series by taking the mean across sites and then daily averaging.
-3. Build a multivariate dataset with:
-   - lookback window K = 7 days
-   - forecast horizon H = 1 day
-   - calendar covariates: month, day of week, day of year, weekend flag, and seasonal sine/cosine features
-   - optional weather covariates when present in the input table
-4. Split chronologically using the first full calendar year of available daily data (`--train-end auto`):
+1. Load hourly AirNow NO2 data from NetCDF files and compute the hourly mean across sites.
+2. Build direct one-step daily supervision samples:
+   - input for sample d: one full day of hourly NO2 values (24 x 1)
+   - target for sample d: next-day daily mean NO2 (day d+1)
+   - one prediction target per valid day, no recursive multi-step rollout
+3. Split chronologically using the first full calendar year of available daily target dates (`--train-end auto`):
    - for the current AirNow range, training resolves to 2023-07-01 through 2024-06-30
    - testing is the remaining tail (currently 2024-07-01 through 2024-09-30)
-5. Fit min-max scaling on training data only, then apply to train and test.
-6. Train each model on the same split and evaluate on the same test period.
-7. Save predictions, metrics, checkpoints, and plots.
+4. Fit min-max scaling on training data only, then apply to train and test.
+5. Train each model on the same split and evaluate on the same test period.
+6. Save predictions, metrics, checkpoints, and plots.
 
 ## Model results (this run)
 
@@ -35,14 +33,14 @@ From metrics.csv:
 
 | Model | Epochs | Test MAE (ppb) | Test RMSE (ppb) |
 |---|---:|---:|---:|
-| GNN | 50 | 0.745 | 0.930 |
-| Mamba | 50 | 0.720 | 0.934 |
-| Transformer | 50 | 0.919 | 1.118 |
+| Transformer | 1 | 1.695 | 1.980 |
+| Mamba | 1 | 2.201 | 2.439 |
+| GNN | 1 | 5.207 | 5.309 |
 
 Quick takeaways:
-- GNN has the best RMSE (slightly fewer large misses).
-- Mamba has the best MAE (best typical absolute error).
-- Transformer is weaker than the other two in this specific run.
+- Transformer performs best in this quick 1-epoch check.
+- Mamba is second on both MAE and RMSE.
+- GNN underperforms in this short run and likely needs longer training.
 
 ## Graphs and how to interpret them
 
@@ -51,8 +49,8 @@ Quick takeaways:
 ![Time Series Comparison](plots/timeseries_all_models.png)
 
 What this plot is:
-- Black line: actual NO2 on the test period.
-- Colored lines: each model prediction over the same dates.
+- Black line: actual daily NO2 across the full timeline.
+- Colored lines: each model's one-step predictions only on their target dates (NaN elsewhere).
 
 How to interpret:
 - Better models follow the black line shape, peaks, and dips.
@@ -62,19 +60,18 @@ How to interpret:
 What to look for in this run:
 - Mamba and GNN generally track observed changes more closely than Transformer.
 
-### 1b) Hourly time-series diagnostic
+### 1b) Daily forecast overlay
 
 ![Hourly Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
 
 What this plot is:
-- Black line: hourly AirNow mean across all sites.
-- Gray line: daily mean aggregated from the hourly series.
-- Colored markers: each model's daily forecast target dates.
+- Gray line: actual daily NO2 across the full timeline.
+- Colored lines/markers: each model's daily one-step forecasts on target dates only (NaN on non-target dates).
 
 How to interpret:
-- This gives a denser hourly view of the same period shown in the daily comparison.
-- The forecast markers are aligned to the target date, not the last input date.
-- If the forecast markers appear shifted right or left relative to the daily series, that indicates a date alignment bug.
+- This panel emphasizes date alignment and start-of-forecast behavior.
+- Forecast points should begin at the first valid target day and not appear on earlier days.
+- Any right-shift relative to actual daily dates indicates an alignment issue.
 
 ### 2) Scatter (actual vs predicted)
 

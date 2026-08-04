@@ -180,25 +180,45 @@ def train_one_model(
     return model, summary, pred_df
 
 
-def save_plots(results_dir: Path, merged_preds: dict[str, pd.DataFrame], metrics_df: pd.DataFrame) -> None:
+def save_plots(
+    results_dir: Path,
+    merged_preds: dict[str, pd.DataFrame],
+    metrics_df: pd.DataFrame,
+    actual_daily_df: pd.DataFrame,
+) -> None:
     plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    hourly_df = build_hourly_series()
+    actual_daily = actual_daily_df.copy()
+    actual_daily["date"] = pd.to_datetime(actual_daily["date"])
+    actual_daily = actual_daily.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+    color_map = {
+        "transformer": "#2E86AB",  # ocean blue
+        "mamba": "#F18F01",        # amber
+        "gnn": "#00A676",          # teal green
+    }
+
+    aligned_preds: dict[str, pd.DataFrame] = {}
+    for name, dfp in merged_preds.items():
+        tmp = dfp.copy()
+        tmp["date"] = pd.to_datetime(tmp["date"])
+        # Keep predictions only on true target dates; all earlier/non-target days stay NaN.
+        aligned = actual_daily[["date"]].merge(tmp[["date", "pred_ppb"]], on="date", how="left")
+        aligned_preds[name] = aligned
 
     # 1) Combined test time-series plot
     plt.figure(figsize=(13, 5))
-    first_model = next(iter(merged_preds))
-    ref = merged_preds[first_model]
-    plt.plot(ref["date"], ref["actual_ppb"], label="Actual", linewidth=2.0, color="black", alpha=0.85)
-    color_map = {
-        "transformer": "tab:blue",
-        "mamba": "tab:orange",
-        "gnn": "tab:green",
-    }
-    for name, dfp in merged_preds.items():
-        plt.plot(dfp["date"], dfp["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
-    plt.title("Forecast Daily: Test Set Time Series (Actual vs Predictions)")
+    plt.plot(actual_daily["date"], actual_daily["airnow_no2"], label="Actual", linewidth=2.0, color="#1F1F1F", alpha=0.9)
+    for name, aligned in aligned_preds.items():
+        plt.plot(
+            aligned["date"],
+            aligned["pred_ppb"],
+            label=f"{name.title()} Pred",
+            linewidth=1.8,
+            alpha=0.95,
+            color=color_map.get(name),
+        )
+    plt.title("Forecast Daily: Full Timeline (Actual) With Date-Aligned Forecasts")
     plt.xlabel("Date")
     plt.ylabel("NO2 (ppb)")
     plt.grid(alpha=0.25)
@@ -207,46 +227,31 @@ def save_plots(results_dir: Path, merged_preds: dict[str, pd.DataFrame], metrics
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
 
-    # 1b) Hourly series with daily forecast points overlaid
+    # 1b) Daily comparison with prediction markers on target dates only
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(
-        hourly_df["date"],
-        hourly_df["airnow_no2"],
-        label="Actual hourly mean",
-        color="black",
-        linewidth=0.7,
-        alpha=0.75,
-    )
-
-    hourly_daily = hourly_df.set_index("date").resample("D").mean().dropna().reset_index()
-    ax.plot(
-        hourly_daily["date"],
-        hourly_daily["airnow_no2"],
+        actual_daily["date"],
+        actual_daily["airnow_no2"],
         label="Actual daily mean",
-        color="dimgray",
-        linewidth=1.8,
-        alpha=0.85,
+        color="#4A4A4A",
+        linewidth=1.9,
+        alpha=0.9,
     )
 
-    color_map = {
-        "transformer": "tab:blue",
-        "mamba": "tab:orange",
-        "gnn": "tab:green",
-    }
-    for name, dfp in merged_preds.items():
+    for name, aligned in aligned_preds.items():
         ax.plot(
-            pd.to_datetime(dfp["date"]),
-            dfp["pred_ppb"],
+            aligned["date"],
+            aligned["pred_ppb"],
             label=f"{name.title()} daily forecast",
-            linewidth=0,
+            linewidth=1.4,
             marker="o",
-            markersize=3.2,
-            alpha=0.9,
+            markersize=2.8,
+            alpha=0.95,
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Hourly Time Series With Daily Forecast Targets")
-    ax.set_xlabel("Date / Hour")
+    ax.set_title("Forecast Daily: Daily Comparison With Target-Date Predictions")
+    ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
     ax.legend(ncol=2, fontsize=9)
@@ -315,16 +320,17 @@ def main() -> None:
     results_dir = root / args.results_dir
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Building daily series from AirNow hourly NetCDF files...")
-    daily_df = build_daily_series()
-    effective_train_end = resolve_train_end(prepare_series(daily_df), train_end=args.train_end)
+    print("Building hourly series from AirNow NetCDF files for daily supervision...")
+    hourly_df = build_hourly_series()
+    daily_df = hourly_df.set_index("date").resample("D").mean().dropna().reset_index()
+    effective_train_end = resolve_train_end(prepare_series(hourly_df), train_end=args.train_end)
     print(f"Using train_end={effective_train_end.date()} (chronological split)")
     daily_csv = results_dir / "airnow_no2_daily_mean.csv"
     daily_df.to_csv(daily_csv, index=False)
     print(f"Saved daily CSV: {daily_csv}")
 
     train_loader, test_loader, scaler = make_dataloaders(
-        daily_df,
+        hourly_df,
         batch_size=args.batch_size,
         train_end=args.train_end,
     )
@@ -335,9 +341,8 @@ def main() -> None:
     input_dim = int(train_loader.dataset.X.shape[-1])
     target_dates = getattr(test_loader.dataset, "target_dates", None)
     if target_dates is None:
-        target_dates = target_dates_for_test(daily_df, args.train_end)
-    else:
-        target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
+        raise ValueError("Dataset did not provide target_dates required for aligned one-step evaluation")
+    target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
 
     if not target_dates.empty and (target_dates <= effective_train_end).any():
         bad = target_dates[target_dates <= effective_train_end].iloc[0]
@@ -409,7 +414,7 @@ def main() -> None:
     metrics_df.to_csv(metrics_csv, index=False)
     metrics_df.to_json(metrics_json, orient="records", indent=2)
 
-    save_plots(results_dir, merged_preds, metrics_df)
+    save_plots(results_dir, merged_preds, metrics_df, daily_df)
 
     print("\nDone. Artifacts saved to:", results_dir)
     print("- Daily CSV")
