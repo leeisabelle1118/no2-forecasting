@@ -249,6 +249,52 @@ def save_plots(
     plt.savefig(plots_dir / "daily_timeseries_with_target_aligned_forecasts.png", dpi=160)
     plt.close(fig)
 
+    # 1c) Zoomed 3-month (test target) view with strict target-date alignment.
+    target_date_values: list[pd.Timestamp] = []
+    for aligned in aligned_preds.values():
+        valid_dates = aligned.loc[aligned["pred_ppb"].notna(), "date"]
+        if not valid_dates.empty:
+            target_date_values.extend(pd.to_datetime(valid_dates).tolist())
+
+    if target_date_values:
+        zoom_start = pd.Timestamp(min(target_date_values))
+        zoom_end = pd.Timestamp(max(target_date_values))
+        zoom_actual = actual_daily[(actual_daily["date"] >= zoom_start) & (actual_daily["date"] <= zoom_end)]
+
+        fig, ax = plt.subplots(figsize=(14, 5))
+        ax.plot(
+            zoom_actual["date"],
+            zoom_actual["airnow_no2"],
+            label="Actual daily mean",
+            color="black",
+            linewidth=2.0,
+            alpha=0.9,
+        )
+
+        for name, aligned in aligned_preds.items():
+            zoom_pred = aligned[(aligned["date"] >= zoom_start) & (aligned["date"] <= zoom_end)]
+            ax.plot(
+                zoom_pred["date"],
+                zoom_pred["pred_ppb"],
+                label=f"{name.title()} daily forecast",
+                linewidth=1.3,
+                marker="o",
+                markersize=3.0,
+                alpha=0.9,
+                color=color_map.get(name),
+            )
+
+        ax.set_title("Forecast Daily: 3-Month Test Window (Target-Date Aligned)")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("NO2 (ppb)")
+        ax.grid(alpha=0.25)
+        ax.legend(ncol=2, fontsize=9)
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
+        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+        plt.tight_layout()
+        plt.savefig(plots_dir / "timeseries_test_3_months.png", dpi=160)
+        plt.close(fig)
+
     # 2) Per-model scatter plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True, sharey=True)
     for ax, (name, dfp) in zip(axes, merged_preds.items()):
