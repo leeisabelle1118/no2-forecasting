@@ -48,14 +48,6 @@ def build_daily_series() -> pd.DataFrame:
     return daily.reset_index(drop=True)
 
 
-def build_hourly_series() -> pd.DataFrame:
-    """Create an hourly mean NO2 series across all sites for plotting."""
-    df_hourly = load_all()
-    hourly_mean = df_hourly.mean(axis=1).dropna().sort_index()
-    hourly = pd.DataFrame({"date": hourly_mean.index, "airnow_no2": hourly_mean.values})
-    return hourly.reset_index(drop=True)
-
-
 def evaluate_scaled(model: nn.Module, loader, device: str) -> tuple[float, float]:
     model.eval()
     mse = nn.MSELoss(reduction="sum")
@@ -192,10 +184,11 @@ def save_plots(
     actual_daily = actual_daily_df.copy()
     actual_daily["date"] = pd.to_datetime(actual_daily["date"])
     actual_daily = actual_daily.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+
     color_map = {
-        "transformer": "#2E86AB",  # ocean blue
-        "mamba": "#F18F01",        # amber
-        "gnn": "#00A676",          # teal green
+        "transformer": "tab:blue",
+        "mamba": "tab:orange",
+        "gnn": "tab:green",
     }
 
     aligned_preds: dict[str, pd.DataFrame] = {}
@@ -204,14 +197,12 @@ def save_plots(
         tmp["date"] = pd.to_datetime(tmp["date"])
         tmp = tmp.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
         tmp["pred_ppb"] = pd.to_numeric(tmp["pred_ppb"], errors="coerce")
-        # Keep predictions only on true target dates; all earlier/non-target days stay NaN.
         aligned = actual_daily[["date"]].merge(
             tmp[["date", "pred_ppb"]],
             on="date",
             how="left",
             validate="one_to_one",
         )
-        # Safety check: aligned prediction series must exactly follow full actual timeline.
         if len(aligned) != len(actual_daily) or not aligned["date"].equals(actual_daily["date"]):
             raise ValueError(
                 f"Aligned prediction timeline mismatch for {name}: "
@@ -219,41 +210,29 @@ def save_plots(
             )
         aligned_preds[name] = aligned
 
-    # Zoom all daily time-series charts to the prediction horizon (typically ~3 months).
-    pred_start = min(df.loc[df["pred_ppb"].notna(), "date"].min() for df in aligned_preds.values())
-    pred_end = max(df.loc[df["pred_ppb"].notna(), "date"].max() for df in aligned_preds.values())
-
-    # 1) Combined test time-series plot
+    # 1) Full daily timeline with aligned forecast overlays.
     plt.figure(figsize=(13, 5))
-    plt.plot(actual_daily["date"], actual_daily["airnow_no2"], label="Actual", linewidth=2.0, color="#1F1F1F", alpha=0.9)
+    plt.plot(actual_daily["date"], actual_daily["airnow_no2"], label="Actual", linewidth=2.0, color="black", alpha=0.85)
     for name, aligned in aligned_preds.items():
-        plt.plot(
-            aligned["date"],
-            aligned["pred_ppb"],
-            label=f"{name.title()} Pred",
-            linewidth=1.8,
-            alpha=0.95,
-            color=color_map.get(name),
-        )
-    plt.title("Forecast Daily: Predicted Period (Daily Actual vs Date-Aligned Forecasts)")
+        plt.plot(aligned["date"], aligned["pred_ppb"], label=f"{name.title()} Pred", linewidth=1.6, alpha=0.9, color=color_map.get(name))
+    plt.title("Forecast Daily: Full Timeline (Actual Daily vs Date-Aligned Forecasts)")
     plt.xlabel("Date")
     plt.ylabel("NO2 (ppb)")
     plt.grid(alpha=0.25)
     plt.legend()
-    plt.xlim(pred_start, pred_end)
     plt.tight_layout()
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
 
-    # 1b) Daily comparison with prediction markers on target dates only
+    # 1b) Daily line + prediction markers on exact target dates (NaN elsewhere).
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(
         actual_daily["date"],
         actual_daily["airnow_no2"],
         label="Actual daily mean",
-        color="#4A4A4A",
-        linewidth=1.9,
-        alpha=0.9,
+        color="dimgray",
+        linewidth=1.8,
+        alpha=0.85,
     )
 
     for name, aligned in aligned_preds.items():
@@ -261,19 +240,18 @@ def save_plots(
             aligned["date"],
             aligned["pred_ppb"],
             label=f"{name.title()} daily forecast",
-            linewidth=1.4,
+            linewidth=1.2,
             marker="o",
-            markersize=2.8,
-            alpha=0.95,
+            markersize=3.2,
+            alpha=0.9,
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Zoomed Daily Forecast Window")
+    ax.set_title("Forecast Daily: Full-Year Daily Series With Forecast Targets")
     ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
     ax.legend(ncol=2, fontsize=9)
-    ax.set_xlim(pred_start, pred_end)
     ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
     ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
     plt.tight_layout()
@@ -339,17 +317,16 @@ def main() -> None:
     results_dir = root / args.results_dir
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Building hourly series from AirNow NetCDF files for daily supervision...")
-    hourly_df = build_hourly_series()
-    daily_df = hourly_df.set_index("date").resample("D").mean().dropna().reset_index()
-    effective_train_end = resolve_train_end(prepare_series(hourly_df), train_end=args.train_end)
+    print("Building daily series from AirNow hourly NetCDF files...")
+    daily_df = build_daily_series()
+    effective_train_end = resolve_train_end(prepare_series(daily_df), train_end=args.train_end)
     print(f"Using train_end={effective_train_end.date()} (chronological split)")
     daily_csv = results_dir / "airnow_no2_daily_mean.csv"
     daily_df.to_csv(daily_csv, index=False)
     print(f"Saved daily CSV: {daily_csv}")
 
     train_loader, test_loader, scaler = make_dataloaders(
-        hourly_df,
+        daily_df,
         batch_size=args.batch_size,
         train_end=args.train_end,
     )
@@ -360,8 +337,9 @@ def main() -> None:
     input_dim = int(train_loader.dataset.X.shape[-1])
     target_dates = getattr(test_loader.dataset, "target_dates", None)
     if target_dates is None:
-        raise ValueError("Dataset did not provide target_dates required for aligned one-step evaluation")
-    target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
+        target_dates = target_dates_for_test(daily_df, args.train_end)
+    else:
+        target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
 
     if not target_dates.empty and (target_dates <= effective_train_end).any():
         bad = target_dates[target_dates <= effective_train_end].iloc[0]

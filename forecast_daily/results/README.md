@@ -15,17 +15,24 @@ python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 
 ```
 
 Methodology pipeline:
-1. Load hourly AirNow NO2 data from NetCDF files and compute the hourly mean across sites.
-2. Build direct one-step daily supervision samples:
-   - input for sample d: one full day of hourly NO2 values (24 x 1)
-   - target for sample d: next-day daily mean NO2 (day d+1)
-   - one prediction target per valid day, no recursive multi-step rollout
-3. Split chronologically using the first full calendar year of available daily target dates (`--train-end auto`):
-   - for the current AirNow range, training resolves to 2023-07-01 through 2024-06-30
-   - testing is the remaining tail (currently 2024-07-01 through 2024-09-30)
-4. Fit min-max scaling on training data only, then apply to train and test.
-5. Train each model on the same split and evaluate on the same test period.
-6. Save predictions, metrics, checkpoints, and plots.
+1. Load hourly AirNow NO2 data from NetCDF files.
+2. Aggregate to one daily mean series (site-mean hourly values resampled to daily means).
+3. Build direct one-step daily supervision using lagged daily windows:
+   - input window K = 7 past daily rows
+   - target horizon H = 1 day ahead (direct t+1)
+   - no recursive multi-day rollout
+4. Add daily covariates per timestamp:
+   - calendar features: month, day of week, day of year, weekend flag
+   - cyclic encodings: sin/cos for month, day-of-week, and day-of-year
+   - optional weather covariates when numeric columns are available
+5. Split chronologically with `--train-end auto`:
+   - train on first full year from the earliest date
+   - test on later dates only
+6. Fit scaling on train only:
+   - NO2 target channel uses train-only min-max scaling
+   - optional weather channels use train-only standardization
+7. Train all models on identical train/test windows and evaluate on the same target dates.
+8. Save predictions, metrics, checkpoints, and plots.
 
 ## Model results (this run)
 
@@ -33,14 +40,14 @@ From metrics.csv:
 
 | Model | Epochs | Test MAE (ppb) | Test RMSE (ppb) |
 |---|---:|---:|---:|
-| Transformer | 1 | 1.695 | 1.980 |
-| Mamba | 1 | 2.201 | 2.439 |
-| GNN | 1 | 5.207 | 5.309 |
+| GNN | 50 | 0.745 | 0.930 |
+| Mamba | 50 | 0.720 | 0.934 |
+| Transformer | 50 | 0.919 | 1.118 |
 
 Quick takeaways:
-- Transformer performs best in this quick 1-epoch check.
-- Mamba is second on both MAE and RMSE.
-- GNN underperforms in this short run and likely needs longer training.
+- GNN has the best RMSE (slightly fewer large misses).
+- Mamba has the best MAE (best typical absolute error).
+- Transformer is weaker than the other two in this specific run.
 
 ## Graphs and how to interpret them
 
@@ -49,8 +56,8 @@ Quick takeaways:
 ![Time Series Comparison](plots/timeseries_all_models.png)
 
 What this plot is:
-- Black line: actual daily NO2 across the full timeline.
-- Colored lines: each model's one-step predictions only on their target dates (NaN elsewhere).
+- Black line: actual daily NO2 across the full available timeline.
+- Colored lines: each model prediction on target dates only (NaN on non-target dates).
 
 How to interpret:
 - Better models follow the black line shape, peaks, and dips.
@@ -60,18 +67,21 @@ How to interpret:
 What to look for in this run:
 - Mamba and GNN generally track observed changes more closely than Transformer.
 
-### 1b) Daily forecast overlay
+### 1b) Daily time-series diagnostic
 
-![Hourly Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
+![Daily Time Series](plots/hourly_timeseries_with_daily_forecasts.png)
 
 What this plot is:
-- Gray line: actual daily NO2 across the full timeline.
-- Colored lines/markers: each model's daily one-step forecasts on target dates only (NaN on non-target dates).
+- Gray line: actual daily mean NO2 across the full timeline.
+- Colored markers/lines: each model's daily forecast values on target dates only.
 
 How to interpret:
-- This panel emphasizes date alignment and start-of-forecast behavior.
-- Forecast points should begin at the first valid target day and not appear on earlier days.
-- Any right-shift relative to actual daily dates indicates an alignment issue.
+- Forecast points must align to the target date, not the last input date.
+- No forecast values should appear before the test target window.
+- Any visible right-shift or left-shift against daily dates indicates an alignment bug.
+
+Note:
+- The filename `hourly_timeseries_with_daily_forecasts.png` is a legacy artifact name; the current figure is daily-timeline based.
 
 ### 2) Scatter (actual vs predicted)
 
@@ -115,7 +125,9 @@ What to look for in this run:
 - metrics.csv and metrics.json: summary metrics and ranking.
 - history_*.json: per-epoch train/test curves.
 - checkpoints/*.pt: trained model weights.
-- plots/*.png: visual diagnostics.
+- plots/timeseries_all_models.png: full-timeline daily actual line with date-aligned prediction overlays.
+- plots/hourly_timeseries_with_daily_forecasts.png: daily-line diagnostic with target-date forecast markers.
+- plots/scatter_all_models.png and plots/metrics_bar.png: accuracy diagnostics.
 
 ## Re-running experiments
 
