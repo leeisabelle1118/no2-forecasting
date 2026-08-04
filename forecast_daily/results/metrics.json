@@ -1,35 +1,35 @@
 [
   {
-    "model":"transformer",
-    "epochs":1,
-    "test_mae_ppb":1.6950141191,
-    "test_rmse_ppb":1.9795265198,
-    "train_mse_scaled_last":0.0668609673,
-    "test_mse_scaled_last":0.0104104585,
-    "test_mae_scaled_last":0.0873668919,
-    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/transformer_daily.pt",
-    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_transformer.csv"
-  },
-  {
     "model":"mamba",
-    "epochs":1,
-    "test_mae_ppb":2.2005178928,
-    "test_rmse_ppb":2.4388360977,
-    "train_mse_scaled_last":0.0259364706,
-    "test_mse_scaled_last":0.015802009,
-    "test_mae_scaled_last":0.1134222901,
+    "epochs":50,
+    "test_mae_ppb":0.913077414,
+    "test_rmse_ppb":1.1522462368,
+    "train_mse_scaled_last":0.0152834926,
+    "test_mse_scaled_last":0.0074672066,
+    "test_mae_scaled_last":0.0684764722,
     "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/mamba_daily.pt",
     "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_mamba.csv"
   },
   {
     "model":"gnn",
-    "epochs":1,
-    "test_mae_ppb":5.2072715759,
-    "test_rmse_ppb":5.3091254234,
-    "train_mse_scaled_last":0.1956865916,
-    "test_mse_scaled_last":0.0748847049,
-    "test_mae_scaled_last":0.2684008142,
+    "epochs":50,
+    "test_mae_ppb":1.0282474756,
+    "test_rmse_ppb":1.2980622053,
+    "train_mse_scaled_last":0.0276690794,
+    "test_mse_scaled_last":0.0094767308,
+    "test_mae_scaled_last":0.0771136859,
     "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/gnn_daily.pt",
     "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_gnn.csv"
+  },
+  {
+    "model":"transformer",
+    "epochs":50,
+    "test_mae_ppb":1.3408697844,
+    "test_rmse_ppb":1.5760675669,
+    "train_mse_scaled_last":0.0460478084,
+    "test_mse_scaled_last":0.0139706703,
+    "test_mae_scaled_last":0.1005588756,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/checkpoints\/transformer_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results\/predictions_transformer.csv"
   }
 ]
