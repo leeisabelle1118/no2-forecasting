@@ -75,6 +75,18 @@ How to interpret:
 - Any visible right-shift or left-shift against daily dates indicates an alignment bug.
 - Gaps before the first test target date are expected and confirm correct alignment.
 
+### 1c) Zoomed 3-month test window
+
+![3-Month Time Series](plots/timeseries_test_3_months.png)
+
+What this plot is:
+- Black line: actual daily mean NO2 over the test-target 3-month window.
+- Colored lines/markers: model forecasts only on valid t+1 target dates.
+
+How to interpret:
+- Use this view to inspect short-term alignment, peak capture, and day-to-day error.
+- Forecast curves should stay date-aligned with the daily target timeline.
+
 ### 2) Scatter (actual vs predicted)
 
 ![Scatter Comparison](plots/scatter_all_models.png)
@@ -119,6 +131,7 @@ What to look for in this run:
 - checkpoints/*.pt: trained model weights.
 - plots/timeseries_all_models.png: full-timeline daily actual line with date-aligned prediction overlays.
 - plots/daily_timeseries_with_target_aligned_forecasts.png: daily-line diagnostic with target-date forecast markers.
+- plots/timeseries_test_3_months.png: zoomed 3-month test-window daily timeline with target-date-aligned forecasts.
 - plots/scatter_all_models.png and plots/metrics_bar.png: accuracy diagnostics.
 
 ## Re-running experiments
