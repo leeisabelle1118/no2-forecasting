@@ -215,8 +215,24 @@ def main():
                          n_layers=n_layers)
     else:  # gnn
         from data.load_airnow import site_meta
-        meta = site_meta(args.data_dir)
-        adj  = build_knn_adj(meta["lat"].values, meta["lon"].values, k=args.k_nn)
+        meta = site_meta(args.data_dir).reindex(sites)
+        known_mask = meta["lat"].notna() & meta["lon"].notna()
+        known_idx = np.where(known_mask.values)[0]
+
+        # Build a full adjacency aligned to load_sequences site order.
+        # Sites without metadata remain self-loop-only identity rows.
+        adj = torch.eye(n_sites, dtype=torch.float32)
+        if len(known_idx) >= 2:
+            adj_known = build_knn_adj(
+                meta.loc[known_mask, "lat"].values,
+                meta.loc[known_mask, "lon"].values,
+                k=args.k_nn,
+            )
+            adj[np.ix_(known_idx, known_idx)] = adj_known
+
+        assert adj.shape == (n_sites, n_sites), (
+            f"Adjacency shape {tuple(adj.shape)} does not match ({n_sites}, {n_sites})"
+        )
         model = NO2GNN(n_sites=n_sites, seq_len=args.seq_len,
                        pred_len=args.pred_len, d_model=args.d_model,
                        n_layers=n_layers, k_nn=args.k_nn, adj=adj)

@@ -1,0 +1,87 @@
+/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12080). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+
+======================================================================
+  Model        : gnn
+  Device       : cpu
+  Seq/Pred     : 24h look-back → 6h forecast
+  ==== 12-MONTH TRAINING WINDOW ====
+  Train-proper : 2023-07-01 → 2024-05-31
+  Validation   : 2024-06-01 → 2024-06-30
+  ==== 3-MONTH TEST WINDOW ====
+  Test period  : 2024-07-01 → 2024-09-30
+======================================================================
+
+Loading data …
+  Train : 8,064 windows  (2023-07-01T00 → 2024-05-31T23)
+  Val   : 720 windows  (2024-06-01T00 → 2024-06-30T23)
+  Test  : 2,179 windows  (2024-07-01T00 → 2024-09-29T18)
+
+  Parameters: 34,054
+
+Epoch   1/50 | train=0.8195  val_mse=0.6886  val_mae=0.3929  lr=1.00e-03  (285.6s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   2/50 | train=0.6858  val_mse=0.6386  val_mae=0.3866  lr=1.00e-03  (406.4s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   3/50 | train=0.6598  val_mse=0.5969  val_mae=0.3598  lr=1.00e-03  (469.7s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   4/50 | train=0.6347  val_mse=0.5698  val_mae=0.3488  lr=1.00e-03  (454.9s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   5/50 | train=0.6199  val_mse=0.5533  val_mae=0.3538  lr=1.00e-03  (514.2s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   6/50 | train=0.6069  val_mse=0.5389  val_mae=0.3444  lr=1.00e-03  (503.7s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   7/50 | train=0.5976  val_mse=0.5299  val_mae=0.3400  lr=1.00e-03  (512.5s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch   8/50 | train=0.5925  val_mse=0.5314  val_mae=0.3678  lr=1.00e-03  (497.4s)
+Epoch   9/50 | train=0.5891  val_mse=0.5285  val_mae=0.3736  lr=1.00e-03  (560.5s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  10/50 | train=0.5869  val_mse=0.5326  val_mae=0.3852  lr=1.00e-03  (472.5s)
+Epoch  11/50 | train=0.5841  val_mse=0.5078  val_mae=0.3418  lr=1.00e-03  (431.7s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  12/50 | train=0.5795  val_mse=0.5060  val_mae=0.3551  lr=1.00e-03  (399.8s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  13/50 | train=0.5783  val_mse=0.5085  val_mae=0.3569  lr=1.00e-03  (376.0s)
+Epoch  14/50 | train=0.5769  val_mse=0.5119  val_mae=0.3677  lr=1.00e-03  (366.3s)
+Epoch  15/50 | train=0.5771  val_mse=0.5029  val_mae=0.3357  lr=1.00e-03  (370.3s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  16/50 | train=0.5748  val_mse=0.5253  val_mae=0.4032  lr=1.00e-03  (371.6s)
+Epoch  17/50 | train=0.5744  val_mse=0.4975  val_mae=0.3498  lr=1.00e-03  (380.7s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  18/50 | train=0.5714  val_mse=0.4991  val_mae=0.3447  lr=1.00e-03  (377.2s)
+Epoch  19/50 | train=0.5698  val_mse=0.4957  val_mae=0.3526  lr=1.00e-03  (376.5s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  20/50 | train=0.5687  val_mse=0.4919  val_mae=0.3440  lr=1.00e-03  (371.8s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  21/50 | train=0.5681  val_mse=0.4955  val_mae=0.3530  lr=1.00e-03  (401.4s)
+Epoch  22/50 | train=0.5705  val_mse=0.4938  val_mae=0.3352  lr=1.00e-03  (466.5s)
+Epoch  23/50 | train=0.5669  val_mse=0.4903  val_mae=0.3448  lr=1.00e-03  (507.0s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  24/50 | train=0.5668  val_mse=0.4913  val_mae=0.3379  lr=1.00e-03  (512.9s)
+Epoch  25/50 | train=0.5645  val_mse=0.4952  val_mae=0.3444  lr=1.00e-03  (492.3s)
+Epoch  26/50 | train=0.5628  val_mse=0.4904  val_mae=0.3434  lr=1.00e-03  (429.4s)
+Epoch  27/50 | train=0.5628  val_mse=0.4914  val_mae=0.3411  lr=5.00e-04  (476.8s)
+Epoch  28/50 | train=0.5589  val_mse=0.4900  val_mae=0.3448  lr=5.00e-04  (496.4s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  29/50 | train=0.5584  val_mse=0.4892  val_mae=0.3377  lr=5.00e-04  (498.5s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  30/50 | train=0.5580  val_mse=0.4897  val_mae=0.3501  lr=5.00e-04  (456.4s)
+Epoch  31/50 | train=0.5584  val_mse=0.4841  val_mae=0.3396  lr=5.00e-04  (470.5s)
+  ✓ Saved best checkpoint → gnn_s24_p6_d64.pt
+Epoch  32/50 | train=0.5567  val_mse=0.4883  val_mae=0.3433  lr=5.00e-04  (439.9s)
+Epoch  33/50 | train=0.5572  val_mse=0.4895  val_mae=0.3514  lr=5.00e-04  (436.5s)
+Epoch  34/50 | train=0.5571  val_mse=0.4853  val_mae=0.3366  lr=5.00e-04  (408.3s)
+Epoch  35/50 | train=0.5563  val_mse=0.4938  val_mae=0.3555  lr=2.50e-04  (366.6s)
+Epoch  36/50 | train=0.5543  val_mse=0.4843  val_mae=0.3398  lr=2.50e-04  (365.0s)
+Epoch  37/50 | train=0.5537  val_mse=0.4854  val_mae=0.3332  lr=2.50e-04  (356.7s)
+Epoch  38/50 | train=0.5545  val_mse=0.4884  val_mae=0.3516  lr=2.50e-04  (362.4s)
+Epoch  39/50 | train=0.5531  val_mse=0.4884  val_mae=0.3427  lr=1.25e-04  (367.6s)
+  Early stopping at epoch 39 (best val_mse=0.4841)
+
+Loading best checkpoint for test evaluation …
+
+============================================================
+  TEST  mse=0.8044   mae=0.4298
+============================================================
+
+History saved → /mnt/data3/isybelle1118/NO2 Forecasting/outputs/gnn_s24_p6_d64_history.json

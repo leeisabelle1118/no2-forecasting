@@ -1,0 +1,92 @@
+nohup: ignoring input
+/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12080). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+Building daily series from AirNow hourly NetCDF files...
+Saved daily CSV: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/airnow_no2_daily_mean.csv
+Using device: cpu
+
+=== Training transformer ===
+[transformer] epoch   1/200 train_mse=0.1374 test_mse=0.0298 test_mae=0.1570
+[transformer] epoch  10/200 train_mse=0.0193 test_mse=0.0063 test_mae=0.0645
+[transformer] epoch  20/200 train_mse=0.0226 test_mse=0.0059 test_mae=0.0596
+[transformer] epoch  30/200 train_mse=0.0141 test_mse=0.0054 test_mae=0.0583
+[transformer] epoch  40/200 train_mse=0.0216 test_mse=0.0071 test_mae=0.0673
+[transformer] epoch  50/200 train_mse=0.0150 test_mse=0.0070 test_mae=0.0689
+[transformer] epoch  60/200 train_mse=0.0136 test_mse=0.0058 test_mae=0.0620
+[transformer] epoch  70/200 train_mse=0.0129 test_mse=0.0056 test_mae=0.0592
+[transformer] epoch  80/200 train_mse=0.0131 test_mse=0.0057 test_mae=0.0591
+[transformer] epoch  90/200 train_mse=0.0119 test_mse=0.0056 test_mae=0.0605
+[transformer] epoch 100/200 train_mse=0.0124 test_mse=0.0056 test_mae=0.0607
+[transformer] epoch 110/200 train_mse=0.0130 test_mse=0.0061 test_mae=0.0643
+[transformer] epoch 120/200 train_mse=0.0127 test_mse=0.0058 test_mae=0.0620
+[transformer] epoch 130/200 train_mse=0.0125 test_mse=0.0063 test_mae=0.0657
+[transformer] epoch 140/200 train_mse=0.0122 test_mse=0.0070 test_mae=0.0690
+[transformer] epoch 150/200 train_mse=0.0130 test_mse=0.0051 test_mae=0.0563
+[transformer] epoch 160/200 train_mse=0.0131 test_mse=0.0051 test_mae=0.0555
+[transformer] epoch 170/200 train_mse=0.0150 test_mse=0.0062 test_mae=0.0617
+[transformer] epoch 180/200 train_mse=0.0132 test_mse=0.0055 test_mae=0.0581
+[transformer] epoch 190/200 train_mse=0.0123 test_mse=0.0066 test_mae=0.0675
+[transformer] epoch 200/200 train_mse=0.0119 test_mse=0.0060 test_mae=0.0632
+Saved checkpoint: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/checkpoints/transformer_daily.pt
+Saved predictions: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/predictions_transformer.csv
+
+=== Training mamba ===
+[mamba] epoch   1/200 train_mse=0.0614 test_mse=0.0443 test_mae=0.1922
+[mamba] epoch  10/200 train_mse=0.0197 test_mse=0.0079 test_mae=0.0696
+[mamba] epoch  20/200 train_mse=0.0165 test_mse=0.0068 test_mae=0.0650
+[mamba] epoch  30/200 train_mse=0.0129 test_mse=0.0056 test_mae=0.0595
+[mamba] epoch  40/200 train_mse=0.0132 test_mse=0.0055 test_mae=0.0585
+[mamba] epoch  50/200 train_mse=0.0116 test_mse=0.0050 test_mae=0.0554
+[mamba] epoch  60/200 train_mse=0.0117 test_mse=0.0049 test_mae=0.0553
+[mamba] epoch  70/200 train_mse=0.0131 test_mse=0.0049 test_mae=0.0537
+[mamba] epoch  80/200 train_mse=0.0125 test_mse=0.0053 test_mae=0.0569
+[mamba] epoch  90/200 train_mse=0.0113 test_mse=0.0051 test_mae=0.0571
+[mamba] epoch 100/200 train_mse=0.0116 test_mse=0.0046 test_mae=0.0519
+[mamba] epoch 110/200 train_mse=0.0112 test_mse=0.0048 test_mae=0.0534
+[mamba] epoch 120/200 train_mse=0.0118 test_mse=0.0049 test_mae=0.0540
+[mamba] epoch 130/200 train_mse=0.0117 test_mse=0.0057 test_mae=0.0602
+[mamba] epoch 140/200 train_mse=0.0112 test_mse=0.0048 test_mae=0.0534
+[mamba] epoch 150/200 train_mse=0.0108 test_mse=0.0048 test_mae=0.0537
+[mamba] epoch 160/200 train_mse=0.0113 test_mse=0.0050 test_mae=0.0555
+[mamba] epoch 170/200 train_mse=0.0114 test_mse=0.0049 test_mae=0.0548
+[mamba] epoch 180/200 train_mse=0.0108 test_mse=0.0048 test_mae=0.0538
+[mamba] epoch 190/200 train_mse=0.0106 test_mse=0.0046 test_mae=0.0531
+[mamba] epoch 200/200 train_mse=0.0108 test_mse=0.0046 test_mae=0.0531
+Saved checkpoint: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/checkpoints/mamba_daily.pt
+Saved predictions: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/predictions_mamba.csv
+
+=== Training gnn ===
+[gnn] epoch   1/200 train_mse=0.0948 test_mse=0.0188 test_mae=0.1177
+[gnn] epoch  10/200 train_mse=0.0135 test_mse=0.0060 test_mae=0.0612
+[gnn] epoch  20/200 train_mse=0.0124 test_mse=0.0056 test_mae=0.0593
+[gnn] epoch  30/200 train_mse=0.0115 test_mse=0.0052 test_mae=0.0570
+[gnn] epoch  40/200 train_mse=0.0111 test_mse=0.0049 test_mae=0.0558
+[gnn] epoch  50/200 train_mse=0.0109 test_mse=0.0049 test_mae=0.0559
+[gnn] epoch  60/200 train_mse=0.0109 test_mse=0.0049 test_mae=0.0561
+[gnn] epoch  70/200 train_mse=0.0109 test_mse=0.0049 test_mae=0.0560
+[gnn] epoch  80/200 train_mse=0.0133 test_mse=0.0054 test_mae=0.0579
+[gnn] epoch  90/200 train_mse=0.0107 test_mse=0.0047 test_mae=0.0549
+[gnn] epoch 100/200 train_mse=0.0106 test_mse=0.0048 test_mae=0.0552
+[gnn] epoch 110/200 train_mse=0.0106 test_mse=0.0048 test_mae=0.0555
+[gnn] epoch 120/200 train_mse=0.0105 test_mse=0.0049 test_mae=0.0564
+[gnn] epoch 130/200 train_mse=0.0116 test_mse=0.0063 test_mae=0.0646
+[gnn] epoch 140/200 train_mse=0.0104 test_mse=0.0047 test_mae=0.0548
+[gnn] epoch 150/200 train_mse=0.0104 test_mse=0.0046 test_mae=0.0545
+[gnn] epoch 160/200 train_mse=0.0105 test_mse=0.0046 test_mae=0.0538
+[gnn] epoch 170/200 train_mse=0.0106 test_mse=0.0047 test_mae=0.0554
+[gnn] epoch 180/200 train_mse=0.0101 test_mse=0.0048 test_mae=0.0559
+[gnn] epoch 190/200 train_mse=0.0101 test_mse=0.0044 test_mae=0.0526
+[gnn] epoch 200/200 train_mse=0.0100 test_mse=0.0050 test_mae=0.0567
+Saved checkpoint: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/checkpoints/gnn_daily.pt
+Saved predictions: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200/predictions_gnn.csv
+
+Done. Artifacts saved to: /mnt/data3/isybelle1118/NO2 Forecasting/forecast_daily/results_longrun_20260728_194200
+- Daily CSV
+- Per-model checkpoints and predictions
+- Histories
+- Plots: timeseries, scatter, metrics bar
+
+Model ranking by RMSE (ppb):
+1. mamba: RMSE=0.906, MAE=0.708
+2. gnn: RMSE=0.939, MAE=0.756
+3. transformer: RMSE=1.033, MAE=0.843

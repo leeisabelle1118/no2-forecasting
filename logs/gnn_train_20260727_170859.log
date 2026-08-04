@@ -1,0 +1,43 @@
+/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12080). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+
+======================================================================
+  Model        : gnn
+  Device       : cpu
+  Seq/Pred     : 24h look-back → 6h forecast
+  ==== 12-MONTH TRAINING WINDOW ====
+  Train-proper : 2023-07-01 → 2024-05-31
+  Validation   : 2024-06-01 → 2024-06-30
+  ==== 3-MONTH TEST WINDOW ====
+  Test period  : 2024-07-01 → 2024-09-30
+======================================================================
+
+Loading data …
+  Train : 8,064 windows  (2023-07-01T00 → 2024-05-31T23)
+  Val   : 720 windows  (2024-06-01T00 → 2024-06-30T23)
+  Test  : 2,179 windows  (2024-07-01T00 → 2024-09-29T18)
+
+  Parameters: 34,054
+
+Traceback (most recent call last):
+  File "/mnt/data3/isybelle1118/NO2 Forecasting/train.py", line 294, in <module>
+    main()
+  File "/mnt/data3/isybelle1118/NO2 Forecasting/train.py", line 234, in main
+    history = train_with_checkpointing(
+  File "/mnt/data3/isybelle1118/NO2 Forecasting/train.py", line 112, in train_with_checkpointing
+    loss = loss_fn(model(xb), yb)
+  File "/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/data3/isybelle1118/NO2 Forecasting/models/gnn_no2.py", line 185, in forward
+    h = gcn(h, self.adj) + skip(h)   # residual skip connection
+  File "/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/data3/isybelle1118/NO2 Forecasting/models/gnn_no2.py", line 111, in forward
+    h = torch.einsum("ij,bjf->bif", adj, h)     # graph mixing: Â h
+  File "/mnt/data3/isybelle1118/.venv/lib/python3.10/site-packages/torch/functional.py", line 373, in einsum
+    return _VF.einsum(equation, operands)  # type: ignore[attr-defined]
+RuntimeError: einsum(): subscript j has size 197 for operand 1 which does not broadcast with previously seen size 182

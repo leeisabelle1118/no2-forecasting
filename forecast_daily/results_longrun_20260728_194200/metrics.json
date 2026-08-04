@@ -1,0 +1,35 @@
+[
+  {
+    "model":"mamba",
+    "epochs":200,
+    "test_mae_ppb":0.707710743,
+    "test_rmse_ppb":0.9062641859,
+    "train_mse_scaled_last":0.0107634635,
+    "test_mse_scaled_last":0.0046193115,
+    "test_mae_scaled_last":0.0530749391,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/checkpoints\/mamba_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/predictions_mamba.csv"
+  },
+  {
+    "model":"gnn",
+    "epochs":200,
+    "test_mae_ppb":0.7555608153,
+    "test_rmse_ppb":0.9387238622,
+    "train_mse_scaled_last":0.0099707563,
+    "test_mse_scaled_last":0.0049561379,
+    "test_mae_scaled_last":0.0566634767,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/checkpoints\/gnn_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/predictions_gnn.csv"
+  },
+  {
+    "model":"transformer",
+    "epochs":200,
+    "test_mae_ppb":0.8432527184,
+    "test_rmse_ppb":1.0325505733,
+    "train_mse_scaled_last":0.0119480968,
+    "test_mse_scaled_last":0.0059963978,
+    "test_mae_scaled_last":0.0632399601,
+    "checkpoint":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/checkpoints\/transformer_daily.pt",
+    "predictions_csv":"\/mnt\/data3\/isybelle1118\/NO2 Forecasting\/forecast_daily\/results_longrun_20260728_194200\/predictions_transformer.csv"
+  }
+]
