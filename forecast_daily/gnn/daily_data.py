@@ -1,19 +1,17 @@
-"""PyTorch Dataset/DataLoader for AirNow NO2 forecasting with multivariate inputs.
+"""Simple daily lagged dataset utilities for forecast_daily.
 
-Requirements implemented:
-- Input DataFrame has columns: 'date', 'airnow_no2'
+Pipeline contract:
+- One daily NO2 value per day
 - Lookback window K=7 days
-- Forecast lead time H=1 day (predict t+1)
-- X shape per batch: (batch_size, 7, n_features)
-- y shape per batch: (batch_size, 1)
-- Chronological train/test split (no random shuffle)
-- Min-max scaling fit on TRAIN ONLY
+- Direct one-step horizon H=1 day (t+1)
+- Chronological train/test split
+- Min-max scaling fit on train only
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -24,23 +22,6 @@ from torch.utils.data import DataLoader, Dataset
 LOOKBACK_DAYS = 7
 LEAD_DAYS = 1
 FULL_YEAR_END = pd.Timestamp("2024-06-30")
-
-
-CALENDAR_FEATURE_COLUMNS = [
-    "month",
-    "day_of_week",
-    "day_of_year",
-    "is_weekend",
-    "month_sin",
-    "month_cos",
-    "dow_sin",
-    "dow_cos",
-    "doy_sin",
-    "doy_cos",
-]
-
-
-EXCLUDED_FOR_AUTO_WEATHER = set(["date", "airnow_no2"] + CALENDAR_FEATURE_COLUMNS)
 
 
 @dataclass
@@ -65,73 +46,12 @@ class MinMaxScaler1D:
         return (x_scaled * (self.max_ - self.min_) + self.min_).astype(np.float32)
 
 
-@dataclass
-class StandardScalerND:
-    """Column-wise standard scaler for weather covariates fit on train only."""
-
-    mean_: np.ndarray
-    std_: np.ndarray
-
-    @classmethod
-    def fit(cls, x_train: np.ndarray) -> "StandardScalerND":
-        mean = np.nanmean(x_train, axis=0)
-        std = np.nanstd(x_train, axis=0)
-        std = np.where((std == 0.0) | np.isnan(std), 1.0, std)
-        mean = np.where(np.isnan(mean), 0.0, mean)
-        return cls(mean_=mean.astype(np.float32), std_=std.astype(np.float32))
-
-    def transform(self, x: np.ndarray) -> np.ndarray:
-        out = (x - self.mean_) / self.std_
-        return np.nan_to_num(out, nan=0.0).astype(np.float32)
-
-
-def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Add calendar covariates for each daily timestamp."""
-    out = df.copy()
-    dates = pd.to_datetime(out["date"])
-
-    out["month"] = dates.dt.month.astype(np.float32)
-    out["day_of_week"] = dates.dt.dayofweek.astype(np.float32)
-    out["day_of_year"] = dates.dt.dayofyear.astype(np.float32)
-    out["is_weekend"] = (dates.dt.dayofweek >= 5).astype(np.float32)
-
-    month_pos = (out["month"] - 1.0) / 12.0
-    dow_pos = out["day_of_week"] / 7.0
-    doy_pos = (out["day_of_year"] - 1.0) / 366.0
-
-    out["month_sin"] = np.sin(2.0 * np.pi * month_pos)
-    out["month_cos"] = np.cos(2.0 * np.pi * month_pos)
-    out["dow_sin"] = np.sin(2.0 * np.pi * dow_pos)
-    out["dow_cos"] = np.cos(2.0 * np.pi * dow_pos)
-    out["doy_sin"] = np.sin(2.0 * np.pi * doy_pos)
-    out["doy_cos"] = np.cos(2.0 * np.pi * doy_pos)
-
-    return out
-
-
-def _resolve_weather_columns(
-    df: pd.DataFrame,
-    weather_feature_cols: List[str] | None,
-) -> List[str]:
-    if weather_feature_cols:
-        return [c for c in weather_feature_cols if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
-
-    auto_cols: List[str] = []
-    for col in df.columns:
-        if col in EXCLUDED_FOR_AUTO_WEATHER:
-            continue
-        if pd.api.types.is_numeric_dtype(df[col]):
-            auto_cols.append(col)
-    return auto_cols
-
-
 class AirNowNO2Dataset(Dataset):
-    """Windowed multivariate dataset for forecasting y(t+H) from past K points."""
+    """Windowed univariate dataset for forecasting y(t+H) from past K values."""
 
     def __init__(
         self,
         values_scaled: np.ndarray,
-        feature_matrix: np.ndarray,
         lookback: int = LOOKBACK_DAYS,
         lead: int = LEAD_DAYS,
         dates: np.ndarray | pd.Series | None = None,
@@ -148,10 +68,6 @@ class AirNowNO2Dataset(Dataset):
             raise ValueError(
                 f"forecast_daily supports direct one-step forecasting only (lead={LEAD_DAYS}); got lead={lead}"
             )
-        if feature_matrix.ndim != 2:
-            raise ValueError("feature_matrix must be a 2D array")
-        if feature_matrix.shape[0] != len(values_scaled):
-            raise ValueError("feature_matrix must have the same number of rows as values_scaled")
         if len(values_scaled) < lookback + lead:
             raise ValueError("Not enough data points for requested lookback/lead")
         if dates is not None and len(dates) != len(values_scaled):
@@ -160,8 +76,8 @@ class AirNowNO2Dataset(Dataset):
         self.lookback = lookback
         self.lead = lead
 
-        X, y, target_dates = self._make_windows(values_scaled, feature_matrix, lookback, lead, dates)
-        # X: (N, K, F), y: (N,) -> (N, 1)
+        X, y, target_dates = self._make_windows(values_scaled, lookback, lead, dates)
+        # X: (N, K, 1), y: (N,) -> (N, 1)
         self.X = torch.from_numpy(X).float()
         self.y = torch.from_numpy(y[:, None]).float()
         self.target_dates = pd.to_datetime(target_dates) if target_dates is not None else None
@@ -169,7 +85,6 @@ class AirNowNO2Dataset(Dataset):
     @staticmethod
     def _make_windows(
         values: np.ndarray,
-        feature_matrix: np.ndarray,
         lookback: int,
         lead: int,
         dates: np.ndarray | pd.Series | None = None,
@@ -179,9 +94,7 @@ class AirNowNO2Dataset(Dataset):
         # Here i is window start.
         max_start = len(values) - (lookback + lead) + 1
         for i in range(max_start):
-            x_no2 = values[i : i + lookback][:, None]
-            x_calendar = feature_matrix[i : i + lookback]
-            x_window = np.concatenate([x_no2, x_calendar], axis=1)
+            x_window = values[i : i + lookback][:, None]
             y_target = values[i + lookback + lead - 1]
             X_list.append(x_window)
             y_list.append(y_target)
@@ -201,7 +114,7 @@ class AirNowNO2Dataset(Dataset):
 
 
 def prepare_series(df: pd.DataFrame) -> pd.DataFrame:
-    """Validate schema and enforce chronological order while preserving extra features."""
+    """Validate schema and enforce chronological order."""
     required = {"date", "airnow_no2"}
     missing = required - set(df.columns)
     if missing:
@@ -257,25 +170,14 @@ def make_dataloaders(
     train_end: str | pd.Timestamp | None = "auto",
     lookback: int = LOOKBACK_DAYS,
     lead: int = LEAD_DAYS,
-    include_time_features: bool = True,
-    include_weather_features: bool = True,
-    weather_feature_cols: List[str] | None = None,
 ) -> Tuple[DataLoader, DataLoader, MinMaxScaler1D]:
-    """Build train/test dataloaders with multivariate windows.
-
-    Input channels include lagged NO2 (always), optional calendar features,
-    and optional weather features.
-    """
+    """Build train/test dataloaders for simple daily lagged forecasting."""
     if lead != LEAD_DAYS:
         raise ValueError(
             f"forecast_daily supports direct one-step forecasting only (lead={LEAD_DAYS}); got lead={lead}"
         )
 
     df = prepare_series(df)
-    if include_time_features:
-        df = add_calendar_features(df)
-
-    weather_cols = _resolve_weather_columns(df, weather_feature_cols) if include_weather_features else []
     train_df, test_df = chronological_split(df, train_end=train_end)
 
     # Guardrails: ensure strict chronological train->test ordering.
@@ -291,27 +193,6 @@ def make_dataloaders(
     train_values = train_df["airnow_no2"].to_numpy(dtype=np.float32)
     test_values = test_df["airnow_no2"].to_numpy(dtype=np.float32)
 
-    feature_blocks_train: List[np.ndarray] = []
-    feature_blocks_test: List[np.ndarray] = []
-
-    if include_time_features:
-        feature_blocks_train.append(train_df[CALENDAR_FEATURE_COLUMNS].to_numpy(dtype=np.float32))
-        feature_blocks_test.append(test_df[CALENDAR_FEATURE_COLUMNS].to_numpy(dtype=np.float32))
-
-    if weather_cols:
-        weather_train_raw = train_df[weather_cols].to_numpy(dtype=np.float32)
-        weather_test_raw = test_df[weather_cols].to_numpy(dtype=np.float32)
-        weather_scaler = StandardScalerND.fit(weather_train_raw)
-        feature_blocks_train.append(weather_scaler.transform(weather_train_raw))
-        feature_blocks_test.append(weather_scaler.transform(weather_test_raw))
-
-    if feature_blocks_train:
-        train_features = np.concatenate(feature_blocks_train, axis=1)
-        test_features = np.concatenate(feature_blocks_test, axis=1)
-    else:
-        train_features = np.zeros((len(train_df), 0), dtype=np.float32)
-        test_features = np.zeros((len(test_df), 0), dtype=np.float32)
-
     train_dates = train_df["date"].to_numpy()
     test_dates = test_df["date"].to_numpy()
 
@@ -322,14 +203,12 @@ def make_dataloaders(
 
     train_ds = AirNowNO2Dataset(
         train_scaled,
-        feature_matrix=train_features,
         lookback=lookback,
         lead=lead,
         dates=train_dates,
     )
     test_ds = AirNowNO2Dataset(
         test_scaled,
-        feature_matrix=test_features,
         lookback=lookback,
         lead=lead,
         dates=test_dates,
@@ -340,14 +219,8 @@ def make_dataloaders(
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
 
     # Attach metadata for downstream scripts and checks.
-    feature_names: List[str] = ["airnow_no2"]
-    if include_time_features:
-        feature_names.extend(CALENDAR_FEATURE_COLUMNS)
-    feature_names.extend(weather_cols)
-    train_ds.feature_names = feature_names
-    test_ds.feature_names = feature_names
-    train_ds.weather_feature_columns = weather_cols
-    test_ds.weather_feature_columns = weather_cols
+    train_ds.feature_names = ["airnow_no2_lagged"]
+    test_ds.feature_names = ["airnow_no2_lagged"]
     train_ds.split_train_end = pd.Timestamp(train_df["date"].max())
     test_ds.split_test_start = pd.Timestamp(test_df["date"].min())
     train_ds.forecast_horizon_days = LEAD_DAYS
@@ -378,7 +251,7 @@ def _demo() -> None:
     )
 
     xb, yb = next(iter(train_loader))
-    print(f"Train batch X shape: {tuple(xb.shape)}")  # (batch, 7, n_features)
+    print(f"Train batch X shape: {tuple(xb.shape)}")  # (batch, 7, 1)
     print(f"Train batch y shape: {tuple(yb.shape)}")  # (batch, 1)
     print(f"Feature names: {train_loader.dataset.feature_names}")
     print(f"Scaler min/max: {scaler.min_:.3f}, {scaler.max_:.3f}")

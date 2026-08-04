@@ -16,7 +16,7 @@ from daily_data import make_dataloaders
 
 
 class DailyGNN(nn.Module):
-    """Single-node temporal GNN-style model for multivariate daily inputs."""
+    """Single-node temporal GNN-style model for univariate daily lag inputs."""
 
     def __init__(self, input_dim: int = 1, hidden_size: int = 32):
         super().__init__()

@@ -16,7 +16,7 @@ from daily_data import make_dataloaders
 
 
 class DailyMambaLike(nn.Module):
-    """Lightweight sequence model for daily multivariate forecasting.
+    """Lightweight sequence model for daily univariate lagged forecasting.
 
     This is a practical stand-in for daily experimentation where a dedicated
     mamba package may not be installed.

@@ -3,6 +3,7 @@
 Daily lagged NO2 forecasting pipeline using a strict direct one-step target:
 - Lookback window K = 7 daily rows
 - Forecast horizon H = 1 day (direct t+1)
+- One scalar NO2 value per day as the only model input channel
 - Chronological split with train end set by --train-end (default: auto first full year)
 - Predictions aligned only to valid target dates in the test window
 
@@ -15,7 +16,7 @@ from the hourly multi-site sequence models in the project root.
 
 1. Load AirNow archive values and aggregate to one canonical daily mean series.
 2. Build lagged daily windows of length 7.
-3. Predict the next daily value directly (no recursive multi-step rollout).
+3. Predict the next daily value directly (no recursive multi-step rollout, no hourly-to-daily supervision).
 4. Train Transformer, Mamba-like, and GNN-style daily models on the same split.
 5. Save checkpoints, dated predictions, metrics, and aligned plots.
 
@@ -38,7 +39,7 @@ Outputs are written under forecast_daily/results by default.
 ## Plots
 
 - plots/timeseries_all_models.png: full daily actual series with prediction overlays on valid target dates.
-- plots/daily_timeseries_with_target_aligned_forecasts.png: daily target-alignment diagnostic.
+- plots/daily_timeseries_with_target_aligned_forecasts.png: full-year daily actual series with forecast markers only on valid target dates.
 - plots/scatter_all_models.png: actual vs predicted scatter.
 - plots/metrics_bar.png: MAE/RMSE comparison.
 

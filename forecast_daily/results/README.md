@@ -16,23 +16,17 @@ python forecast_daily/generate_results.py --epochs 50 --batch-size 32 --lr 1e-3 
 
 Methodology pipeline:
 1. Build one canonical daily NO2 mean series (site-mean values per day).
-2. Use only daily-to-daily supervision (no hourly-to-daily supervision).
+2. Keep one scalar NO2 value per day as the only model input channel.
 3. Build direct one-step daily supervision using lagged daily windows:
    - input window K = 7 past daily rows
    - target horizon H = 1 day ahead (direct t+1)
    - no recursive multi-day rollout
-4. Add daily covariates per timestamp:
-   - calendar features: month, day of week, day of year, weekend flag
-   - cyclic encodings: sin/cos for month, day-of-week, and day-of-year
-   - optional weather covariates when numeric columns are available
-5. Split chronologically with `--train-end auto`:
+4. Split chronologically with `--train-end auto`:
    - train on first full year from the earliest date
    - test on later dates only
-6. Fit scaling on train only:
-   - NO2 target channel uses train-only min-max scaling
-   - optional weather channels use train-only standardization
-7. Train all models on identical train/test windows and evaluate on the same target dates.
-8. Save predictions, metrics, checkpoints, and plots.
+5. Fit min-max scaling on train only and apply to train/test daily NO2 values.
+6. Train all models on identical train/test windows and evaluate on the same target dates.
+7. Save predictions, metrics, checkpoints, and plots.
 
 ## Model results (this run)
 
@@ -56,7 +50,7 @@ Quick takeaways:
 ![Time Series Comparison](plots/timeseries_all_models.png)
 
 What this plot is:
-- Black line: actual daily NO2 across the full available timeline.
+- Black line: actual daily NO2 across the full daily train+test timeline.
 - Colored lines: each model prediction on target dates only (NaN on non-target dates).
 
 How to interpret:
@@ -72,13 +66,14 @@ What to look for in this run:
 ![Daily Time Series](plots/daily_timeseries_with_target_aligned_forecasts.png)
 
 What this plot is:
-- Gray line: actual daily mean NO2 across the full timeline.
+- Gray line: actual daily mean NO2 across the full daily train+test timeline.
 - Colored markers/lines: each model's daily forecast values on target dates only.
 
 How to interpret:
 - Forecast points must align to the target date, not the last input date.
 - No forecast values should appear before the test target window.
 - Any visible right-shift or left-shift against daily dates indicates an alignment bug.
+- Gaps before the first test target date are expected and confirm correct alignment.
 
 ### 2) Scatter (actual vs predicted)
 

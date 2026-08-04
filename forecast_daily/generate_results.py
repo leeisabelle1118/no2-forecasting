@@ -23,8 +23,6 @@ from gnn.train_gnn_daily import DailyGNN
 from mamba.train_mamba_daily import DailyMambaLike
 from transformer.daily_data import (
     LEAD_DAYS,
-    LOOKBACK_DAYS,
-    chronological_split,
     make_dataloaders,
     prepare_series,
     resolve_train_end,
@@ -79,21 +77,6 @@ def predict_scaled(model: nn.Module, loader, device: str) -> tuple[np.ndarray, n
     if not preds:
         return np.array([], dtype=np.float32), np.array([], dtype=np.float32)
     return np.concatenate(preds), np.concatenate(trues)
-
-
-def target_dates_for_test(df: pd.DataFrame, train_end: str | pd.Timestamp | None = "auto") -> pd.Series:
-    """Backward-compatible fallback for obtaining test target dates.
-
-    The preferred source is the dataset's own `target_dates` attribute, which
-    is attached by `make_dataloaders()` and guarantees alignment to the actual
-    forecast target index.
-    """
-    ordered = prepare_series(df)
-    _, test_df = chronological_split(ordered, train_end=train_end)
-    target_start = LOOKBACK_DAYS + LEAD_DAYS - 1
-    if len(test_df) <= target_start:
-        return pd.Series(dtype="datetime64[ns]")
-    return test_df.iloc[target_start:]["date"].reset_index(drop=True)
 
 
 def rmse(a: np.ndarray, b: np.ndarray) -> float:
@@ -345,9 +328,8 @@ def main() -> None:
     input_dim = int(train_loader.dataset.X.shape[-1])
     target_dates = getattr(test_loader.dataset, "target_dates", None)
     if target_dates is None:
-        target_dates = target_dates_for_test(daily_df, args.train_end)
-    else:
-        target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
+        raise ValueError("Missing target_dates metadata on test dataset for daily t+1 evaluation")
+    target_dates = pd.Series(pd.to_datetime(target_dates)).reset_index(drop=True)
 
     if not target_dates.empty and (target_dates <= effective_train_end).any():
         bad = target_dates[target_dates <= effective_train_end].iloc[0]

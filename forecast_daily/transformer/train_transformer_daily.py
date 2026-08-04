@@ -16,6 +16,8 @@ from daily_data import make_dataloaders
 
 
 class DailyTransformer(nn.Module):
+    """Compact transformer for univariate daily lagged forecasting."""
+
     def __init__(self, input_dim: int = 1, d_model: int = 32, nhead: int = 4, num_layers: int = 2):
         super().__init__()
         self.in_proj = nn.Linear(input_dim, d_model)
