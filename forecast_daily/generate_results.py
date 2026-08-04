@@ -202,9 +202,26 @@ def save_plots(
     for name, dfp in merged_preds.items():
         tmp = dfp.copy()
         tmp["date"] = pd.to_datetime(tmp["date"])
+        tmp = tmp.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+        tmp["pred_ppb"] = pd.to_numeric(tmp["pred_ppb"], errors="coerce")
         # Keep predictions only on true target dates; all earlier/non-target days stay NaN.
-        aligned = actual_daily[["date"]].merge(tmp[["date", "pred_ppb"]], on="date", how="left")
+        aligned = actual_daily[["date"]].merge(
+            tmp[["date", "pred_ppb"]],
+            on="date",
+            how="left",
+            validate="one_to_one",
+        )
+        # Safety check: aligned prediction series must exactly follow full actual timeline.
+        if len(aligned) != len(actual_daily) or not aligned["date"].equals(actual_daily["date"]):
+            raise ValueError(
+                f"Aligned prediction timeline mismatch for {name}: "
+                f"aligned_rows={len(aligned)} actual_rows={len(actual_daily)}"
+            )
         aligned_preds[name] = aligned
+
+    # Zoom all daily time-series charts to the prediction horizon (typically ~3 months).
+    pred_start = min(df.loc[df["pred_ppb"].notna(), "date"].min() for df in aligned_preds.values())
+    pred_end = max(df.loc[df["pred_ppb"].notna(), "date"].max() for df in aligned_preds.values())
 
     # 1) Combined test time-series plot
     plt.figure(figsize=(13, 5))
@@ -218,11 +235,12 @@ def save_plots(
             alpha=0.95,
             color=color_map.get(name),
         )
-    plt.title("Forecast Daily: Full Timeline (Actual) With Date-Aligned Forecasts")
+    plt.title("Forecast Daily: Predicted Period (Daily Actual vs Date-Aligned Forecasts)")
     plt.xlabel("Date")
     plt.ylabel("NO2 (ppb)")
     plt.grid(alpha=0.25)
     plt.legend()
+    plt.xlim(pred_start, pred_end)
     plt.tight_layout()
     plt.savefig(plots_dir / "timeseries_all_models.png", dpi=160)
     plt.close()
@@ -250,11 +268,12 @@ def save_plots(
             color=color_map.get(name),
         )
 
-    ax.set_title("Forecast Daily: Daily Comparison With Target-Date Predictions")
+    ax.set_title("Forecast Daily: Zoomed Daily Forecast Window")
     ax.set_xlabel("Date")
     ax.set_ylabel("NO2 (ppb)")
     ax.grid(alpha=0.25)
     ax.legend(ncol=2, fontsize=9)
+    ax.set_xlim(pred_start, pred_end)
     ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
     ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
     plt.tight_layout()
