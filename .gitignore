@@ -26,3 +26,7 @@ outputs/predictions_transformer_20240701_20240929.csv
 # Data (large NetCDF files live outside the repo)
 *.nc
 data/*.nc
+
+# Ephemeral forecast_daily experiment directories (ad-hoc run artifacts)
+forecast_daily/results_*/
+forecast_daily/*.log
